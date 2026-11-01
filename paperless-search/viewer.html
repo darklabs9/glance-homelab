@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document</title>
+<!-- PDF viewer for the search page. Android browsers do not display a PDF opened directly
+     (/api/documents/<id>/preview/), so it is drawn page by page with pdf.js.
+     Same host as Paperless (viewer.html?id=N): the browser session is enough. -->
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2733;--sub:#667085;--line:#e4e7ec;--acc:#2f80d1;--acc-tx:#fff;--btn2:#eef2f7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16181d;--card:#1f232a;--tx:#e8eaed;--sub:#98a2b3;--line:#2c313a;--acc:#5aa0e6;--acc-tx:#0d1117;--btn2:#2a2f38}}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--line)}
+header .t{flex:1;min-width:0;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header a{flex:0 0 auto;text-decoration:none;font-size:14px;font-weight:600;padding:8px 12px;border-radius:10px;background:var(--btn2);color:var(--tx)}
+#status{padding:16px;color:var(--sub);font-size:15px}
+#pages{display:flex;flex-direction:column;gap:10px;padding:10px}
+canvas{width:100%;height:auto;background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+</style>
+</head>
+<body>
+<header><a href="javascript:history.back()" aria-label="Back">‹</a><div class="t" id="title">Document</div><a id="dl" href="#">Download</a></header>
+<div id="status">Loading…</div>
+<div id="pages"></div>
+<script>
+const id = new URLSearchParams(location.search).get("id");
+const statusEl = document.getElementById("status");
+async function go() {
+  if (!/^\d+$/.test(id || "")) { statusEl.textContent = "Document not found."; return; }
+  document.getElementById("dl").href = "/api/documents/" + id + "/download/";
+  try {
+    const m = await fetch("/api/documents/" + id + "/?fields=title", {credentials: "same-origin", headers: {"Accept": "application/json"}});
+    if (m.status === 401 || m.status === 403) throw "login";
+    const j = await m.json(); document.getElementById("title").textContent = j.title; document.title = j.title;
+    const r = await fetch("/api/documents/" + id + "/preview/", {credentials: "same-origin"});
+    if (!r.ok) throw "error " + r.status;
+    const type = r.headers.get("content-type") || "";
+    const data = await r.arrayBuffer();
+    if (type.startsWith("image/")) {      // image document (photo, receipt): shown as is
+      const img = document.createElement("img"); img.style.width = "100%"; img.style.borderRadius = "6px";
+      img.src = URL.createObjectURL(new Blob([data], {type})); document.getElementById("pages").appendChild(img);
+      statusEl.remove(); return;
+    }
+    const pdfjsLib = await PS.loadPdfjs();
+    const pdf = await pdfjsLib.getDocument({data}).promise;
+    statusEl.textContent = pdf.numPages + " page" + (pdf.numPages > 1 ? "s" : "");
+    const width = Math.min(document.documentElement.clientWidth - 20, 900) * (window.devicePixelRatio || 1);
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const v1 = page.getViewport({scale: 1});
+      const vp = page.getViewport({scale: width / v1.width});
+      const c = document.createElement("canvas");
+      c.width = vp.width; c.height = vp.height;
+      document.getElementById("pages").appendChild(c);
+      await page.render({canvasContext: c.getContext("2d"), viewport: vp}).promise;
+    }
+  } catch (e) {
+    statusEl.innerHTML = e === "login"
+      ? 'You are not logged in to Paperless in this browser. <a href="/" style="color:var(--acc)">Open Paperless</a>, log in, then come back.'
+      : "The document could not be displayed (" + String(e).replace(/[<>&]/g, "") + "). Try Download instead.";
+  }
+}
+go();
+</script>
+</body>
+</html>

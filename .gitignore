@@ -1,0 +1,13 @@
+# your own settings and secrets
+config.env
+.env
+*.env
+!*.example.env
+config.js
+!config.example.js
+catalog.json
+# generated data
+data/
+__pycache__/
+*.pyc
+.DS_Store

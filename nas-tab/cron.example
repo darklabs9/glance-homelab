@@ -1,0 +1,10 @@
+# /etc/cron.d/nas-state  (adjust /opt/nas-tab to where you copied collector/)
+SHELL=/bin/sh
+# NAS page data, every minute (read only)
+* * * * * root /usr/bin/python3 /opt/nas-tab/nas-state.py --config /opt/nas-tab/config.env >> /var/log/nas-state.log 2>&1
+
+# /etc/cron.d/wifi-ping  (optional) Wi-Fi micro-outages: ping the witness devices every 10 s, log only
+* * * * * root /usr/bin/flock -n /run/lock/wifi-ping.lock /usr/bin/python3 /opt/nas-tab/wifi-ping.py --config /opt/nas-tab/wifi-ping.env >> /var/log/wifi-ping.log 2>&1
+
+# (optional) same script watching the internet line, with its own config (public IPs, other state/log files)
+# * * * * * root /usr/bin/flock -n /run/lock/net-ping.lock /usr/bin/python3 /opt/nas-tab/wifi-ping.py --config /opt/nas-tab/net-ping.env >> /var/log/net-ping.log 2>&1

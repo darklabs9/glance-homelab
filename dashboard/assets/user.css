@@ -1,0 +1,7 @@
+/* Theme tweaks (theme.custom-css-file). Page styles live in home.css, media.css, sky.css, agenda.css. */
+/* Page tabs on phones: 90 % of the Glance size and tighter gaps */
+@media (max-width: 1000px) {
+  .nav-item { font-size: calc(var(--font-size-h3) * 0.9) !important; }
+  .desktop-navigation { gap: 0.9rem !important; }
+  .mobile-navigation-page-links { gap: 1.2rem !important; padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
+}

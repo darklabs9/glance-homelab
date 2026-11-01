@@ -1,0 +1,3 @@
+# /etc/cron.d/arr-notify : regroup Sonarr/Radarr notifications every minute
+SHELL=/bin/sh
+* * * * * root /usr/bin/python3 /opt/arr-notify/arr-notify.py --config /opt/arr-notify/config.env >> /var/log/arr-notify.log 2>&1

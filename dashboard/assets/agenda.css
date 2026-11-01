@@ -1,0 +1,32 @@
+/* Agenda grouped by day (Home page). HTML: custom-api widget in glance.yml; behaviour: assets/agenda.js. Prefix ag-. */
+.ag{--ag-or:hsl(45,95%,62%);--ag-or-doux:hsla(45,95%,62%,.14);--ag-txt:hsl(225,10%,90%);--ag-txt2:hsl(225,8%,70%);--ag-txt3:hsl(225,7%,58%);--ag-ligne:rgba(255,255,255,.07);--ag-ambre:hsl(32,90%,66%);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.ag{color:var(--ag-txt);min-width:0;max-width:100%}
+.ag *{box-sizing:border-box}
+.ag :where(button){font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+.ag button:focus-visible{outline:2px solid var(--ag-or);outline-offset:2px;border-radius:10px}
+.ag-tete{display:flex;align-items:center;gap:8px;padding:2px 0 4px}
+.ag-titre{flex:none;font-size:17px;font-weight:650;color:var(--ag-txt)}
+.ag-nbj{flex:1;min-width:0;font-size:13px;color:var(--ag-txt3);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-liste{margin-top:6px;border-radius:14px;background:rgba(255,255,255,.025);box-shadow:inset 0 0 0 1px var(--ag-ligne)}
+.ag-jour{display:grid;grid-template-columns:52px minmax(0,1fr);gap:0 10px;padding:13px 12px 12px 8px;border-bottom:1px solid var(--ag-ligne)}
+.ag-jour:last-child{border-bottom:0}
+.ag-jdate{text-align:center;padding-top:1px}
+.ag-jdate b{display:block;font-size:27px;font-weight:700;line-height:1;color:var(--ag-txt);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ag-jdate span{display:block;margin-top:5px;font-size:11.5px;font-weight:700;letter-spacing:.07em;color:var(--ag-txt3)}
+.ag-jour.auj .ag-jdate b{color:var(--ag-or)}
+.ag-jcorps{min-width:0}
+.ag-jmt{font-size:12.5px;color:var(--ag-txt3);line-height:1.3;padding:2px 0 5px}
+.ag-jmt .pl{color:hsl(212,75%,74%)}
+.ag-jmt .al{color:var(--ag-ambre)}
+.ag-ev{display:grid;grid-template-columns:50px minmax(0,1fr);gap:0 8px;align-items:baseline;padding:4px 0}
+.ag-h{font-size:14.5px;font-weight:700;color:var(--ag-or);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ag-h.jr{font-size:13px;font-weight:500;color:var(--ag-txt3)}
+.ag-ev:not(.autre) .ag-h.jr{color:var(--ag-or);font-weight:600}
+.ag-t{font-size:15.5px;font-weight:600;color:var(--ag-txt);line-height:1.28;overflow-wrap:anywhere}
+.ag-s{font-size:12.5px;color:var(--ag-txt3);line-height:1.35;margin-top:2px}
+.ag-s:empty{display:none}
+.ag-s b{font-weight:600;color:var(--ag-txt2)}
+.ag-ev.passe{opacity:.45}
+.ag-rien{padding:12px;color:var(--ag-txt3);font-size:13.5px}
+.ag-ev.autre .ag-h{color:var(--ag-txt3);font-weight:600}
+.ag-ev.autre .ag-t{font-weight:500;opacity:.82}

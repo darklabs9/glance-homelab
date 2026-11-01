@@ -1,0 +1,28 @@
+{
+  "items": [
+    {"name": "Bread", "aisle": "Bakery", "keywords": "baguette loaf"},
+    {"name": "Croissants", "aisle": "Bakery", "keywords": "pastry breakfast"},
+    {"name": "Apples", "aisle": "Produce", "keywords": "fruit"},
+    {"name": "Bananas", "aisle": "Produce", "keywords": "fruit"},
+    {"name": "Carrots", "aisle": "Produce", "keywords": "vegetables"},
+    {"name": "Tomatoes", "aisle": "Produce", "keywords": "vegetables salad"},
+    {"name": "Onions", "aisle": "Produce", "keywords": "vegetables"},
+    {"name": "Chicken breast", "aisle": "Meat", "keywords": "poultry"},
+    {"name": "Minced beef", "aisle": "Meat", "keywords": "ground beef mince"},
+    {"name": "Milk", "aisle": "Dairy", "keywords": "semi-skimmed"},
+    {"name": "Butter", "aisle": "Dairy", "keywords": ""},
+    {"name": "Eggs", "aisle": "Dairy", "keywords": "dozen"},
+    {"name": "Yogurt", "aisle": "Dairy", "keywords": "yoghurt"},
+    {"name": "Cheese", "aisle": "Dairy", "keywords": "cheddar gouda"},
+    {"name": "Pasta", "aisle": "Pantry", "keywords": "spaghetti penne"},
+    {"name": "Rice", "aisle": "Pantry", "keywords": "basmati"},
+    {"name": "Olive oil", "aisle": "Pantry", "keywords": "oil"},
+    {"name": "Coffee", "aisle": "Pantry", "keywords": "beans ground"},
+    {"name": "Frozen peas", "aisle": "Frozen", "keywords": "vegetables"},
+    {"name": "Ice cream", "aisle": "Frozen", "keywords": "dessert"},
+    {"name": "Orange juice", "aisle": "Drinks", "keywords": "juice"},
+    {"name": "Sparkling water", "aisle": "Drinks", "keywords": "water"},
+    {"name": "Toilet paper", "aisle": "Household", "keywords": "paper"},
+    {"name": "Dish soap", "aisle": "Household", "keywords": "washing up liquid"}
+  ]
+}

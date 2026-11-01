@@ -1,0 +1,34 @@
+{
+  "groups": [
+    {"id": "entry", "title": "Front door", "entry": true},
+    {"id": "media", "title": "Media"},
+    {"id": "home", "title": "Home"},
+    {"id": "monitoring", "title": "Monitoring"},
+    {"id": "tools", "title": "Tools"}
+  ],
+  "containers": [
+    {"container": "caddy", "name": "Caddy", "group": "entry", "desc": "Reverse proxy, HTTPS for every *.example.lan", "sensitive": "access to every web app"},
+    {"container": "authentik-server", "name": "Authentik", "group": "entry", "desc": "Single sign-on", "deps": ["authentik-worker", "authentik-postgres", "authentik-redis"], "sensitive": "logins to every app"},
+    {"container": "pihole", "name": "Pi-hole", "group": "entry", "desc": "DNS + ad blocking", "sensitive": "DNS for the whole network"},
+    {"container": "tailscale", "name": "Tailscale", "group": "entry", "desc": "Remote access", "sensitive": "remote access"},
+
+    {"container": "jellyfin", "name": "Jellyfin", "group": "media", "desc": "Movies and series", "url": "https://jellyfin.example.lan"},
+    {"container": "sonarr", "name": "Sonarr", "group": "media", "desc": "Series"},
+    {"container": "radarr", "name": "Radarr", "group": "media", "desc": "Movies"},
+    {"container": "prowlarr", "name": "Prowlarr", "group": "media", "desc": "Indexers"},
+    {"container": "jellyseerr", "name": "Jellyseerr", "group": "media", "desc": "Requests"},
+
+    {"container": "homeassistant", "name": "Home Assistant", "group": "home", "desc": "Home automation", "sensitive": "home automation"},
+    {"container": "paperless", "name": "Paperless-ngx", "group": "home", "desc": "Documents", "deps": ["paperless-postgres", "paperless-redis"]},
+    {"container": "mealie", "name": "Mealie", "group": "home", "desc": "Recipes and shopping list"},
+    {"container": "vaultwarden", "name": "Vaultwarden", "group": "home", "desc": "Passwords", "sensitive": "the password vault"},
+
+    {"container": "uptime-kuma", "name": "Uptime Kuma", "group": "monitoring", "desc": "Uptime checks"},
+    {"container": "dozzle", "name": "Dozzle", "group": "monitoring", "desc": "Container logs"},
+    {"container": "ntfy", "name": "ntfy", "group": "monitoring", "desc": "Push notifications"},
+
+    {"container": "glance", "name": "Glance", "group": "tools", "desc": "This dashboard"},
+    {"container": "kopia", "name": "Kopia", "group": "tools", "desc": "Backups"},
+    {"container": "watchtower", "name": "Watchtower", "group": "tools", "desc": "Image updates", "hidden": true}
+  ]
+}

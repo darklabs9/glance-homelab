@@ -1,0 +1,16 @@
+# The pages must be served on the SAME host as Paperless so they can reuse the browser's
+# Paperless session cookie (and its csrftoken). Mount this folder into the Caddy container,
+# e.g. ./paperless-search:/srv/paperless-search:ro
+paperless.example.lan {
+    # tls internal            # if you use Caddy's local CA on a LAN-only name
+
+    redir /search /search/
+    handle_path /search/* {
+        root * /srv/paperless-search
+        file_server
+    }
+
+    handle {
+        reverse_proxy 192.168.1.10:8000   # your Paperless-ngx container
+    }
+}

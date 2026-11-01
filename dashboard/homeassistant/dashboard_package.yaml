@@ -1,0 +1,333 @@
+# Home Assistant side of the dashboard (Home and Media pages).
+# Install: copy to /config/packages/dashboard_package.yaml and enable packages in configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+# Then rename the example entities (smart plugs, lights, vacuum...) to yours and set the webhook ids:
+# use long random strings (webhooks need no login), the same ones as in the Glance environment.
+#
+# What it provides:
+#  - washer / dryer / dishwasher "running" sensors from smart-plug power, start/end timestamps, energy and cost per
+#    cycle, one CSV line per cycle in /config/appliances.csv (read by scripts/appliance_stats.py)
+#  - "last cycle" text sensors used by the Home card
+#  - meter indexes typed in from the dashboard (input_number.meter_*) + sensor.meter_* with long-term statistics
+#  - three webhooks: Home card buttons, meter readings form, Media page buttons (request / delete a download)
+
+input_number:
+  washer_start_ts: {name: Washer start, min: 0, max: 4000000000, step: 1, mode: box}
+  washer_end_ts: {name: Washer end, min: 0, max: 4000000000, step: 1, mode: box}
+  washer_emptied_ts: {name: Washer emptied, min: 0, max: 4000000000, step: 1, mode: box}
+  washer_kwh_start: {name: Washer kWh at start, min: 0, max: 1000000, step: 0.001, unit_of_measurement: kWh, mode: box}
+  dryer_start_ts: {name: Dryer start, min: 0, max: 4000000000, step: 1, mode: box}
+  dryer_end_ts: {name: Dryer end, min: 0, max: 4000000000, step: 1, mode: box}
+  dryer_emptied_ts: {name: Dryer emptied, min: 0, max: 4000000000, step: 1, mode: box}
+  dryer_kwh_start: {name: Dryer kWh at start, min: 0, max: 1000000, step: 0.001, unit_of_measurement: kWh, mode: box}
+  dishwasher_start_ts: {name: Dishwasher start, min: 0, max: 4000000000, step: 1, mode: box}
+  dishwasher_end_ts: {name: Dishwasher end, min: 0, max: 4000000000, step: 1, mode: box}
+  dishwasher_kwh_start: {name: Dishwasher kWh at start, min: 0, max: 1000000, step: 0.001, unit_of_measurement: kWh, mode: box}
+  price_kwh_peak: {name: Electricity price peak, min: 0, max: 5, step: 0.0001, unit_of_measurement: "€/kWh", mode: box}
+  price_kwh_offpeak: {name: Electricity price off-peak, min: 0, max: 5, step: 0.0001, unit_of_measurement: "€/kWh", mode: box}
+  meter_water: {name: Water meter, min: 0, max: 99999999, step: 0.001, unit_of_measurement: "m³", mode: box}
+  meter_gas: {name: Gas meter, min: 0, max: 99999999, step: 0.001, unit_of_measurement: "m³", mode: box}
+  meter_elec_day: {name: Electricity day meter, min: 0, max: 99999999, step: 0.001, unit_of_measurement: kWh, mode: box}
+  meter_elec_night: {name: Electricity night meter, min: 0, max: 99999999, step: 0.001, unit_of_measurement: kWh, mode: box}
+
+input_text:
+  meter_last_reading:
+    name: Last meter reading
+    max: 10
+
+# Energy of each appliance from the smart-plug power (trapezoidal integration: accurate over a cycle).
+# Skip this if your plugs already expose an energy sensor, and use that one in the automations below.
+sensor:
+  - platform: integration
+    source: sensor.washer_power
+    name: Washer energy
+    unique_id: washer_energy
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+  - platform: integration
+    source: sensor.dryer_power
+    name: Dryer energy
+    unique_id: dryer_energy
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+  - platform: integration
+    source: sensor.dishwasher_power
+    name: Dishwasher energy
+    unique_id: dishwasher_energy
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+
+template:
+  - binary_sensor:
+      # running as soon as the plug draws more than 4 W; delay_off covers the pauses inside a cycle (soaking, delayed spin)
+      - name: Washer running
+        unique_id: washer_running
+        device_class: running
+        delay_on: "00:00:30"
+        delay_off: "00:10:00"
+        availability: "{{ states('sensor.washer_power') not in ['unknown', 'unavailable'] }}"
+        state: "{{ states('sensor.washer_power') | float(0) > 4 }}"
+      - name: Dryer running
+        unique_id: dryer_running
+        device_class: running
+        delay_on: "00:00:30"
+        delay_off: "00:05:00"
+        availability: "{{ states('sensor.dryer_power') not in ['unknown', 'unavailable'] }}"
+        state: "{{ states('sensor.dryer_power') | float(0) > 4 }}"
+      # 3 min on: a short spike after the end (door opened) must not start a fake cycle;
+      # 15 min off: the final drying phase draws almost nothing
+      - name: Dishwasher running
+        unique_id: dishwasher_running
+        device_class: running
+        delay_on: "00:03:00"
+        delay_off: "00:15:00"
+        availability: "{{ states('sensor.dishwasher_power') not in ['unknown', 'unavailable'] }}"
+        state: "{{ states('sensor.dishwasher_power') | float(0) > 4 }}"
+      # Off-peak electricity hours: edit to your tariff (here 22:00-7:00 and 11:00-17:00, every day)
+      - name: Off-peak tariff
+        unique_id: offpeak_tariff
+        state: "{{ now().hour >= 22 or now().hour < 7 or (11 <= now().hour < 17) }}"
+  - sensor:
+      # "today at 14:05", "yesterday at 9:30", "3 days ago", "12/10" or "never"
+      - name: Washer last
+        unique_id: washer_last
+        state: >-
+          {% set ts = states('input_number.washer_end_ts') | float(0) %}
+          {% if ts <= 0 %}never
+          {% else %}
+            {% set j = (now().date() - (ts | timestamp_custom('%Y-%m-%d') | as_datetime).date()).days %}
+            {% if j == 0 %}today at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j == 1 %}yesterday at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j < 7 %}{{ j }} days ago
+            {% else %}{{ ts | timestamp_custom('%d/%m') }}
+            {% endif %}
+          {% endif %}
+      - name: Dryer last
+        unique_id: dryer_last
+        state: >-
+          {% set ts = states('input_number.dryer_end_ts') | float(0) %}
+          {% if ts <= 0 %}never
+          {% else %}
+            {% set j = (now().date() - (ts | timestamp_custom('%Y-%m-%d') | as_datetime).date()).days %}
+            {% if j == 0 %}today at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j == 1 %}yesterday at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j < 7 %}{{ j }} days ago
+            {% else %}{{ ts | timestamp_custom('%d/%m') }}
+            {% endif %}
+          {% endif %}
+      - name: Dishwasher last
+        unique_id: dishwasher_last
+        state: >-
+          {% set ts = states('input_number.dishwasher_end_ts') | float(0) %}
+          {% if ts <= 0 %}never
+          {% else %}
+            {% set j = (now().date() - (ts | timestamp_custom('%Y-%m-%d') | as_datetime).date()).days %}
+            {% if j == 0 %}today at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j == 1 %}yesterday at {{ ts | timestamp_custom('%H:%M') }}
+            {% elif j < 7 %}{{ j }} days ago
+            {% else %}{{ ts | timestamp_custom('%d/%m') }}
+            {% endif %}
+          {% endif %}
+      # meter indexes as total_increasing sensors, so Home Assistant keeps long-term statistics (read by meters.py)
+      - name: Meter water
+        unique_id: meter_water
+        unit_of_measurement: "m³"
+        device_class: water
+        state_class: total_increasing
+        state: "{{ states('input_number.meter_water') | float(0) }}"
+        availability: "{{ states('input_number.meter_water') | float(0) > 0 }}"
+      - name: Meter gas
+        unique_id: meter_gas
+        unit_of_measurement: "m³"
+        device_class: gas
+        state_class: total_increasing
+        state: "{{ states('input_number.meter_gas') | float(0) }}"
+        availability: "{{ states('input_number.meter_gas') | float(0) > 0 }}"
+      - name: Meter elec day
+        unique_id: meter_elec_day
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "{{ states('input_number.meter_elec_day') | float(0) }}"
+        availability: "{{ states('input_number.meter_elec_day') | float(0) > 0 }}"
+      - name: Meter elec night
+        unique_id: meter_elec_night
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+        state: "{{ states('input_number.meter_elec_night') | float(0) }}"
+        availability: "{{ states('input_number.meter_elec_night') | float(0) > 0 }}"
+
+# one line per finished cycle: date;device;minutes;kwh;cost;offpeak
+shell_command:
+  appliance_log: >-
+    /bin/sh -c 'printf "%s;%s;%s;%s;%s;%s\n" "{{ now().strftime("%Y-%m-%d %H:%M") }}" "{{ device }}" "{{ minutes | int }}" "{{ kwh | float }}" "{{ cost | float }}" "{{ offpeak | int }}" >> /config/appliances.csv'
+
+# API keys in secrets.yaml (sonarr_api_key, radarr_api_key, seerr_api_key). Replace the hosts with yours.
+rest_command:
+  seerr_request:
+    url: http://192.168.1.10:5055/api/v1/request
+    method: POST
+    headers:
+      X-Api-Key: !secret seerr_api_key
+    content_type: application/json
+    payload: '{"mediaType": "{{ type }}", "mediaId": {{ id | int }}{% if type == "tv" %}, "seasons": "all"{% endif %}}'
+  # remove from the queue AND the download client, blocklist the release, search another one
+  arr_queue_delete_sonarr:
+    url: "http://192.168.1.10:8989/api/v3/queue/bulk?removeFromClient=true&blocklist=true&skipRedownload=false"
+    method: DELETE
+    headers:
+      X-Api-Key: !secret sonarr_api_key
+    content_type: application/json
+    payload: '{"ids": [{{ ids }}]}'
+  arr_queue_delete_radarr:
+    url: "http://192.168.1.10:7878/api/v3/queue/bulk?removeFromClient=true&blocklist=true&skipRedownload=false"
+    method: DELETE
+    headers:
+      X-Api-Key: !secret radarr_api_key
+    content_type: application/json
+    payload: '{"ids": [{{ ids }}]}'
+
+automation:
+  - id: dashboard_appliance_started
+    alias: "Dashboard: appliance started"
+    description: Remember start time and energy meter; starting the dryer or a new wash means the washer was emptied.
+    mode: queued
+    triggers:
+      - {trigger: state, entity_id: binary_sensor.washer_running, from: "off", to: "on", id: washer}
+      - {trigger: state, entity_id: binary_sensor.dryer_running, from: "off", to: "on", id: dryer}
+      - {trigger: state, entity_id: binary_sensor.dishwasher_running, from: "off", to: "on", id: dishwasher}
+    actions:
+      - action: input_number.set_value
+        target: {entity_id: "input_number.{{ trigger.id }}_start_ts"}
+        data: {value: "{{ now().timestamp() | int }}"}
+      - action: input_number.set_value
+        target: {entity_id: "input_number.{{ trigger.id }}_kwh_start"}
+        data: {value: "{{ states('sensor.' ~ trigger.id ~ '_energy') | float(0) }}"}
+      - if: "{{ trigger.id in ['washer', 'dryer'] }}"
+        then:
+          - action: input_number.set_value
+            target: {entity_id: input_number.washer_emptied_ts}
+            data: {value: "{{ now().timestamp() | int }}"}
+      - if: "{{ trigger.id == 'dryer' }}"
+        then:
+          - action: input_number.set_value
+            target: {entity_id: input_number.dryer_emptied_ts}
+            data: {value: "{{ now().timestamp() | int }}"}
+
+  - id: dashboard_appliance_finished
+    alias: "Dashboard: appliance finished"
+    description: End time, one CSV line with duration, energy and cost. Cycles shorter than 10 min are ignored (plug test).
+    mode: queued
+    triggers:
+      - {trigger: state, entity_id: binary_sensor.washer_running, from: "on", to: "off", id: washer}
+      - {trigger: state, entity_id: binary_sensor.dryer_running, from: "on", to: "off", id: dryer}
+      - {trigger: state, entity_id: binary_sensor.dishwasher_running, from: "on", to: "off", id: dishwasher}
+    variables:
+      start: "{{ states('input_number.' ~ trigger.id ~ '_start_ts') | float(0) }}"
+      # the "off" delay of the running sensor is not part of the cycle
+      off_delay: "{{ {'washer': 10, 'dryer': 5, 'dishwasher': 15}[trigger.id] }}"
+      minutes: "{{ [((now().timestamp() - start) / 60) | int - off_delay, 0] | max }}"
+      kwh: "{{ [(states('sensor.' ~ trigger.id ~ '_energy') | float(0)) - (states('input_number.' ~ trigger.id ~ '_kwh_start') | float(0)), 0] | max | round(2) }}"
+      offpeak: >-
+        {% set h = (start | as_datetime | as_local).hour %}{{ 1 if (h >= 22 or h < 7 or (11 <= h < 17)) else 0 }}
+      cost: "{{ (kwh * (states('input_number.price_kwh_offpeak' if offpeak == 1 else 'input_number.price_kwh_peak') | float(0))) | round(2) }}"
+    conditions:
+      - "{{ start > 0 and (now().timestamp() - start) > 600 }}"
+    actions:
+      - action: input_number.set_value
+        target: {entity_id: "input_number.{{ trigger.id }}_end_ts"}
+        data: {value: "{{ now().timestamp() | int }}"}
+      - action: shell_command.appliance_log
+        data: {device: "{{ trigger.id }}", minutes: "{{ minutes }}", kwh: "{{ kwh }}", cost: "{{ cost }}", offpeak: "{{ offpeak }}"}
+        continue_on_error: true
+
+  - id: dashboard_home_buttons
+    alias: "Dashboard: Home card buttons"
+    description: "?target=living_room|hallway|bedroom|tv|robot|todo_done|washer_emptied|dryer_emptied. A tile toggles."
+    mode: parallel
+    max: 10
+    triggers:
+      - trigger: webhook
+        webhook_id: YOUR_HOME_WEBHOOK_ID
+        allowed_methods: [POST]
+        local_only: false
+    variables:
+      target: "{{ trigger.query.target | default('') }}"
+    actions:
+      - choose:
+          - conditions: "{{ target == 'living_room' }}"
+            sequence: [{action: light.toggle, target: {entity_id: light.living_room}}]
+          - conditions: "{{ target == 'hallway' }}"
+            sequence: [{action: light.toggle, target: {entity_id: light.hallway}}]
+          - conditions: "{{ target == 'bedroom' }}"
+            sequence: [{action: switch.toggle, target: {entity_id: switch.bedroom_lamp}}]
+          - conditions: "{{ target == 'tv' }}"
+            sequence: [{action: remote.toggle, target: {entity_id: remote.living_room_tv}}]
+          - conditions: "{{ target == 'robot' }}"
+            sequence:
+              - if: "{{ states('vacuum.robot') in ['cleaning', 'mopping', 'returning'] }}"
+                then: [{action: vacuum.return_to_base, target: {entity_id: vacuum.robot}}]
+                else: [{action: vacuum.start, target: {entity_id: vacuum.robot}}]
+          - conditions: "{{ target == 'todo_done' and (trigger.query.item | default('')) != '' }}"
+            sequence:
+              - action: todo.update_item
+                target: {entity_id: todo.chores}
+                data: {item: "{{ trigger.query.item }}", status: completed}
+          - conditions: "{{ target in ['washer_emptied', 'dryer_emptied'] }}"
+            sequence:
+              - action: input_number.set_value
+                target: {entity_id: "input_number.{{ target | replace('_emptied', '') }}_emptied_ts"}
+                data: {value: "{{ now().timestamp() | int }}"}
+
+  - id: dashboard_meter_readings
+    alias: "Dashboard: meter readings"
+    description: Form of the Meters card (POST water, gas, elec_day, elec_night). Empty, lower than the current index or absurd values are ignored.
+    mode: queued
+    triggers:
+      - trigger: webhook
+        webhook_id: YOUR_METERS_WEBHOOK_ID
+        allowed_methods: [POST]
+        local_only: false
+    actions:
+      - repeat:
+          for_each: [water, gas, elec_day, elec_night]
+          sequence:
+            - variables:
+                val: "{{ trigger.data[repeat.item] | default('') | string | replace(',', '.') | trim }}"
+                cur: "{{ states('input_number.meter_' ~ repeat.item) | float(0) }}"
+            - condition: template
+              value_template: "{{ val != '' and val | is_number and (val | float(-1)) >= cur and (val | float(0)) <= cur + 5000 }}"
+            - action: input_number.set_value
+              target: {entity_id: "input_number.meter_{{ repeat.item }}"}
+              data: {value: "{{ val | float }}"}
+      - if: "{{ ((trigger.data.water | default('')) ~ (trigger.data.gas | default('')) ~ (trigger.data.elec_day | default('')) ~ (trigger.data.elec_night | default(''))) | trim != '' }}"
+        then:
+          - action: input_text.set_value
+            target: {entity_id: input_text.meter_last_reading}
+            data: {value: "{{ now().strftime('%Y-%m-%d') }}"}
+
+  - id: dashboard_media_buttons
+    alias: "Dashboard: Media page buttons"
+    description: "?target=request (POST type=movie|tv, id=<tmdb>, title) or ?target=dl_delete&app=sonarr|radarr&ids=1,2"
+    mode: queued
+    triggers:
+      - trigger: webhook
+        webhook_id: YOUR_MEDIA_WEBHOOK_ID
+        allowed_methods: [POST]
+        local_only: false
+    actions:
+      - choose:
+          - conditions: "{{ trigger.query.target == 'request' and trigger.data.type in ['movie', 'tv'] and (trigger.data.id | int(0)) > 0 }}"
+            sequence:
+              - action: rest_command.seerr_request
+                data: {type: "{{ trigger.data.type }}", id: "{{ trigger.data.id }}"}
+          - conditions: "{{ trigger.query.target == 'dl_delete' and (trigger.query.ids | default('')) | regex_match('^[0-9]+(,[0-9]+)*$') }}"
+            sequence:
+              - if: "{{ trigger.query.app == 'radarr' }}"
+                then: [{action: rest_command.arr_queue_delete_radarr, data: {ids: "{{ trigger.query.ids }}"}}]
+                else: [{action: rest_command.arr_queue_delete_sonarr, data: {ids: "{{ trigger.query.ids }}"}}]

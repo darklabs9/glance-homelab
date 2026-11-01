@@ -1,0 +1,20 @@
+# glance.yml: load the page script and styles once, at the top level
+document:
+  head: |
+    <link rel="stylesheet" href="/assets/nas.css">
+    <script src="/assets/nas.js" defer></script>
+
+# ...then add the page
+pages:
+  - name: NAS
+    slug: nas
+    columns:
+      - size: full
+        widgets:
+          - type: html
+            hide-header: true
+            source: |
+              <div class="nas-app" data-nas-app data-src="/assets/nas-state.json" data-stale-after="300">
+                <input type="hidden" class="nas-keep">
+                <noscript>This page needs JavaScript.</noscript>
+              </div>

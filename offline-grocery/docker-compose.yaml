@@ -1,0 +1,15 @@
+# Offline grocery list for Mealie. Build locally: docker compose up -d --build
+services:
+  offline-grocery:
+    build: .
+    image: offline-grocery:local
+    container_name: offline-grocery
+    env_file: .env              # MEALIE_URL, MEALIE_TOKEN, MEALIE_LIST_ID... (see config.example.env)
+    environment:
+      TZ: Europe/London
+    ports:
+      - "8080:8080"             # put an HTTPS reverse proxy in front (service workers and push need HTTPS)
+    volumes:
+      - ./data:/data            # VAPID keys + subscribed devices + last seen list version: back it up
+      - ./catalog.json:/config/catalog.json:ro   # optional item catalog (suggestions + aisle guessing)
+    restart: unless-stopped

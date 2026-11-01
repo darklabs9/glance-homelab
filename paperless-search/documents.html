@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Documents</title>
+<!-- Phone-first "Documents" page for Paperless-ngx.
+     Served by Caddy on the same host as Paperless (e.g. https://paperless.example.lan/search/documents.html),
+     so the browser's Paperless session is enough (no token stored here).
+     Full-text search, saved views (/api/saved_views/), in-page pdf.js viewer, "Expiring soon" (a Date custom
+     field), a Scan button (scan.html) and an inbox triage mode (?inbox=1).
+     The VIEWS block (renderViews) is isolated so its layout can change without touching the rest. -->
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+:root{
+  --bg:hsl(225,14%,11%);--card:hsl(225,13%,15%);--card2:hsl(225,12%,19%);--line:hsl(225,10%,24%);
+  --tx:hsl(220,15%,92%);--sub:hsl(220,9%,64%);--faint:hsl(220,8%,48%);
+  --acc:hsl(210,90%,64%);--gold:hsl(45,95%,62%);--amber:hsl(36,92%,58%);--red:hsl(0,72%,66%);
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 Inter,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+a{color:inherit}
+button{font:inherit;color:inherit}
+main{max-width:760px;margin:0 auto;padding:12px 16px 40px}
+svg{width:20px;height:20px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* header */
+.top{display:flex;align-items:center;gap:10px;margin:4px 0 10px}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 10px 0 4px;border-radius:12px;text-decoration:none;color:var(--sub);font-weight:600}
+.back:hover{color:var(--tx)}
+.top h1{flex:1;margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.scan{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:14px;background:var(--acc);color:hsl(225,30%,10%);font-weight:700;text-decoration:none}
+
+/* search */
+.searchbar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 10px}
+.field{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 6px 0 14px;border-radius:var(--r);background:var(--card);border:1px solid var(--line)}
+.field:focus-within{border-color:var(--acc)}
+.field input{flex:1;min-width:0;border:0;background:none;color:var(--tx);font:inherit;font-size:17px;outline:none;padding:12px 0}
+.field input::placeholder{color:var(--faint)}
+.field input::-webkit-search-cancel-button{display:none}
+.clear{width:44px;height:44px;border:0;background:none;border-radius:12px;color:var(--sub);display:none;align-items:center;justify-content:center;cursor:pointer}
+.field.filled .clear{display:inline-flex}
+#status{color:var(--sub);font-size:14px;margin:2px 2px 10px;min-height:20px}
+#status a{color:var(--acc)}
+
+/* sections */
+h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:22px 2px 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+
+/* ===== VIEWS (replaceable component: renderViews) ===== */
+.view-group{margin-bottom:14px}
+.view-group-title{font-size:13px;color:var(--sub);margin:0 4px 6px}
+.view{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:8px 14px;border:0;background:none;text-align:left;cursor:pointer;border-top:1px solid var(--line)}
+.view:first-child{border-top:0}
+.view:hover,.view:focus-visible{background:var(--card2);outline:none}
+.view .ic{width:34px;height:34px;border-radius:10px;background:var(--card2);display:inline-flex;align-items:center;justify-content:center;color:var(--sub)}
+.view .ic svg{width:18px;height:18px}
+.view .name{flex:1;min-width:0;font-weight:600}
+.view .count{color:var(--sub);font-variant-numeric:tabular-nums;font-size:15px}
+.view .chev{color:var(--faint)}
+.view.inbox .ic{color:var(--amber)}
+.view.inbox .count{color:var(--amber);font-weight:700}
+/* ===== end VIEWS ===== */
+
+/* document list */
+.doc{display:flex;gap:12px;width:100%;padding:10px 12px;border:0;background:none;text-align:left;cursor:pointer;border-top:1px solid var(--line);min-height:96px;align-items:flex-start}
+.doc:first-child{border-top:0}
+.doc:hover,.doc:focus-visible{background:var(--card2);outline:none}
+.doc img,.doc .no-thumb{width:56px;height:76px;object-fit:cover;object-position:top;border-radius:8px;background:var(--card2);flex:0 0 auto;border:1px solid var(--line)}
+.doc .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.doc .t{font-weight:650;overflow-wrap:anywhere;line-height:1.3}
+.doc .s{color:var(--sub);font-size:13.5px;overflow-wrap:anywhere}
+.doc .h{color:var(--sub);font-size:13.5px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.doc .h b{background:hsla(45,95%,55%,.28);color:var(--tx);font-weight:600;border-radius:3px;padding:0 2px}
+.more{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:none;color:var(--acc);font-weight:600;cursor:pointer}
+.view-head{display:flex;align-items:center;gap:8px;margin:8px 0 10px}
+.view-head button{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 12px 0 6px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--sub);font-weight:600}
+.view-head .title{flex:1;min-width:0;font-weight:700;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.view-head .count{color:var(--sub);font-size:14px}
+
+/* expiring soon */
+.exp{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 14px;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer}
+.exp:first-child{border-top:0}
+.exp:hover{background:var(--card2)}
+.exp .name{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.exp .when{font-size:14px;color:var(--sub);text-align:right;white-space:nowrap}
+.exp.soon .when{color:var(--amber);font-weight:650}
+.exp.past .when{color:var(--red);font-weight:650}
+
+/* viewer */
+#viewer{position:fixed;inset:0;z-index:50;background:hsl(225,16%,8%);display:none;flex-direction:column}
+#viewer.open{display:flex}
+#viewer header{display:flex;align-items:center;gap:8px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--bg)}
+#viewer .t{flex:1;min-width:0;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;padding:0 10px;border-radius:12px;border:0;background:var(--card2);color:var(--tx);text-decoration:none;font-weight:600;font-size:14px;cursor:pointer}
+#viewer .pages{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px;display:flex;flex-direction:column;align-items:center;gap:10px}
+#viewer canvas,#viewer .pages img{width:100%;max-width:900px;height:auto;background:#fff;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+#viewer .msg{color:var(--sub);padding:24px 8px;text-align:center}
+#viewer .bottom{display:flex;gap:8px;justify-content:center;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+#viewer .bottom .ib{flex:1;max-width:240px}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
+
+/* inbox triage: where Paperless filed the document + "Looks good" (removes the inbox tag) */
+.view-head .count.triage{color:var(--amber);font-weight:700}
+.item{padding:12px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .doc{padding:0;min-height:0;border-top:0}
+.item .doc:hover,.item .doc:focus-visible{background:none}
+.filed{margin:12px 0 0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14.5px}
+.filed dt{color:var(--sub)}
+.filed dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.filed dd.missing{color:var(--amber);font-weight:650}
+.chip{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:0 9px;margin:0 4px 2px 0;font-size:13.5px;font-weight:600}
+.actions{display:flex;gap:8px;margin-top:12px}
+.ok{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:14px;border:0;background:var(--acc);color:hsl(225,30%,10%);font-weight:700;font-size:15.5px;cursor:pointer}
+.ok:disabled{opacity:.6;cursor:default}
+.fix{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;padding:0 14px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--tx);font-weight:600;font-size:15px;text-decoration:none}
+.done{display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:60px;border-top:1px solid var(--line);color:var(--sub);font-size:14.5px}
+.done:first-child{border-top:0}
+.done > svg{color:hsl(150,55%,55%)}
+.done b{color:var(--tx);font-weight:600}
+.done span{flex:1;min-width:0;overflow-wrap:anywhere}
+.undo{min-height:44px;padding:0 8px;border:0;background:none;color:var(--acc);font-weight:600;cursor:pointer}
+.all-sorted{padding:22px 16px;text-align:center;color:var(--sub)}
+.all-sorted svg{width:30px;height:30px;color:hsl(150,55%,55%);display:block;margin:0 auto 6px}
+.all-sorted b{display:block;color:var(--tx);font-size:16px}
+#viewer .triage{padding:10px 12px 0;border-top:1px solid var(--line);background:var(--bg)}
+#viewer .triage .filed{margin:0 0 10px;font-size:14px}
+#viewer .triage .actions{margin:0}
+#viewer .triage + .bottom{border-top:0}
+@media (min-width:900px){main{padding-top:20px}}
+@media (prefers-reduced-motion:no-preference){.doc,.view,.exp{transition:background .12s}}
+</style>
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-school" viewBox="0 0 24 24"><path d="m3 9 9-5 9 5-9 5z"/><path d="M7 11v5c0 1.5 2.2 3 5 3s5-1.5 5-3v-5"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v8H4v-8M2 7h20v5H2zM12 20V7M12 7H8a2 2 0 1 1 0-4c2.5 0 4 4 4 4zM12 7h4a2 2 0 1 0 0-4c-2.5 0-4 4-4 4z"/></symbol>
+  <symbol id="i-invoice" viewBox="0 0 24 24"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a3 3 0 0 0 0 6v4h18v-4a3 3 0 0 1 0-6V5H3z"/><path d="M13 5v2M13 11v2M13 17v2"/></symbol>
+  <symbol id="i-work" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17h14v-5l-2-5H7l-2 5zM5 12h14"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/></symbol>
+  <symbol id="i-taxes" viewBox="0 0 24 24"><path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/></symbol>
+  <symbol id="i-health" viewBox="0 0 24 24"><path d="M12 21s-8-4.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.5-8 11-8 11z"/></symbol>
+  <symbol id="i-id" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4M14 14h4M5.5 17c.5-1.8 2-2.5 3.5-2.5s3 .7 3.5 2.5"/></symbol>
+  <symbol id="i-holiday" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7z"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+</svg>
+
+<main>
+  <div class="top">
+    <a class="back" data-back href="#"><svg><use href="#i-left"/></svg><span data-back-label>Back</span></a>
+    <h1>Documents</h1>
+    <a class="scan" href="scan.html"><svg><use href="#i-scan"/></svg>Scan</a>
+  </div>
+
+  <form class="searchbar" id="f" role="search">
+    <label class="sr-only" for="q">Search documents</label>
+    <div class="field" id="field">
+      <svg style="color:var(--faint)"><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="Search documents…" autocomplete="off" enterkeyhint="search">
+      <button type="button" class="clear" id="clear" aria-label="Clear search"><svg><use href="#i-x"/></svg></button>
+    </div>
+  </form>
+  <div id="status" role="status" aria-live="polite"></div>
+  <div id="content"></div>
+</main>
+
+<div id="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-t">
+  <header>
+    <button class="ib" id="viewer-close" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+    <div class="t" id="viewer-t">Document</div>
+    <button class="ib" id="viewer-zoom" aria-label="Zoom" aria-pressed="false"><svg><use href="#i-zoom"/></svg></button>
+  </header>
+  <div class="pages" id="viewer-pages"></div>
+  <div class="triage" id="viewer-triage" hidden>
+    <dl class="filed" id="viewer-filed"></dl>
+    <div class="actions">
+      <button type="button" class="ok" id="viewer-ok"><svg><use href="#i-ok"/></svg>Looks good</button>
+      <a class="fix" id="viewer-fix" href="#" target="_blank" rel="noopener"><svg><use href="#i-pencil"/></svg>Fix</a>
+    </div>
+  </div>
+  <div class="bottom">
+    <a class="ib" id="viewer-dl" href="#"><svg><use href="#i-dl"/></svg>Download</a>
+    <a class="ib" id="viewer-pl" href="#" target="_blank" rel="noopener"><svg><use href="#i-ext"/></svg>Paperless</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var CFG = PS.cfg;
+  var $ = function (id) { return document.getElementById(id); };
+  var q = $("q"), field = $("field"), statusEl = $("status"), content = $("content");
+  var OK_LABEL = "Looks good";
+  q.placeholder = CFG.searchPlaceholder;
+  PS.setupBackLinks();
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
+  // Paperless returns highlights wrapped in <span class="match">…</span> or <b>…</b>: only those tags are let through
+  var highlight = function (s) {
+    return esc(s).replace(/&lt;span class=&quot;match&quot;&gt;/g, '<b>').replace(/&lt;\/span&gt;/g, '</b>')
+                 .replace(/&lt;b&gt;/g, "<b>").replace(/&lt;\/b&gt;/g, "</b>");
+  };
+  var FIELDS = "id,title,created,correspondent,document_type,__search_hit__";
+  var names = { corr: {}, type: {}, tag: {} }, namesLoaded = null;
+
+  function api(path) {
+    return fetch(path, { credentials: "same-origin", headers: { "Accept": "application/json" } }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw "login";
+      if (!r.ok) throw "error " + r.status;
+      return r.json();
+    });
+  }
+  function showError(e) {
+    statusEl.innerHTML = e === "login"
+      ? "You are not logged in to Paperless on this device. <a href=\"/\" target=\"_blank\" rel=\"noopener\">Open Paperless</a> once, log in, then come back."
+      : "Paperless is not answering (" + esc(e) + "). Try again in a moment.";
+  }
+  function loadNames() {
+    if (namesLoaded) return namesLoaded;
+    var p = function (url, target) {
+      return api(url).then(function (d) { d.results.forEach(function (x) { target[x.id] = x.name; }); }).catch(function () {});
+    };
+    namesLoaded = Promise.all([
+      p("/api/correspondents/?page_size=1000&fields=id,name", names.corr),
+      p("/api/document_types/?page_size=1000&fields=id,name", names.type),
+      p("/api/tags/?page_size=1000&fields=id,name", names.tag)
+    ]);
+    return namesLoaded;
+  }
+  // Inbox tags are looked up by their "is inbox tag" flag, never hard-coded.
+  var inboxTagsP = null;
+  function loadInboxTags() {
+    if (!inboxTagsP) inboxTagsP = api("/api/tags/?page_size=1000&fields=id,name,is_inbox_tag").then(function (d) {
+      return d.results.filter(function (t) { return t.is_inbox_tag; }).map(function (t) { return t.id; });
+    }, function (e) { inboxTagsP = null; throw e; });
+    return inboxTagsP;
+  }
+  var fmtDate = PS.formatDate;
+
+  // ---------- saved view rules -> API parameters ----------
+  // (rule types of the Paperless frontend; views using other rules open in Paperless itself)
+  var RULES = { 0: "title__icontains", 1: "content__icontains", 3: "correspondent__id", 4: "document_type__id",
+                6: "tags__id__all", 17: "tags__id__none", 19: "title_content", 22: "tags__id__in" };
+  function viewParams(v) {
+    var p = [];
+    for (var i = 0; i < v.filter_rules.length; i++) {
+      var r = v.filter_rules[i], key = RULES[r.rule_type];
+      if (!key) return null;
+      p.push(encodeURIComponent(key) + "=" + encodeURIComponent(r.value));
+    }
+    var sort = (v.sort_reverse ? "-" : "") + (v.sort_field || "created");
+    p.push("ordering=" + encodeURIComponent(sort));
+    return p.join("&");
+  }
+  function isInboxView(v, inboxIds) {
+    var byRule = (v.filter_rules || []).some(function (r) {
+      return (r.rule_type === 6 || r.rule_type === 22) && String(r.value).split(",").some(function (x) { return inboxIds.indexOf(Number(x)) >= 0; });
+    });
+    return byRule || /inbox/i.test(v.name);
+  }
+
+  // ---------- document row ----------
+  function docRow(x) {
+    var hl = x.__search_hit__ && x.__search_hit__.highlights;
+    var sub = [names.corr[x.correspondent], names.type[x.document_type], fmtDate(x.created, true)].filter(Boolean).join(" · ");
+    return '<button class="doc" type="button" data-id="' + x.id + '" data-title="' + esc(x.title) + '">' +
+      '<img loading="lazy" src="/api/documents/' + x.id + '/thumb/" alt="" onerror="this.outerHTML=\'<span class=no-thumb></span>\'">' +
+      '<span class="info"><span class="t">' + esc(x.title) + '</span>' +
+      (sub ? '<span class="s">' + esc(sub) + '</span>' : '') +
+      (hl ? '<span class="h">' + highlight(hl) + '</span>' : '') + '</span></button>';
+  }
+  function docList(target, url, emptyText, size) {
+    var page = 1; size = size || 25;
+    function load() {
+      return api(url + "&page=" + page + "&page_size=" + size + "&fields=" + FIELDS).then(function (d) {
+        return loadNames().then(function () { return d; });
+      }).then(function (d) {
+        var more = target.querySelector(".more"); if (more) more.remove();
+        if (!d.count) { target.innerHTML = '<div class="msg" style="padding:18px;color:var(--sub)">' + esc(emptyText) + '</div>'; return d; }
+        target.insertAdjacentHTML("beforeend", d.results.map(docRow).join(""));
+        if (d.next) {
+          var b = document.createElement("button"); b.className = "more"; b.type = "button";
+          b.textContent = "Show more (" + (d.count - page * size) + " left)";
+          b.onclick = function () { page++; b.disabled = true; b.textContent = "Loading…"; load(); };
+          target.appendChild(b);
+        }
+        return d;
+      });
+    }
+    return load();
+  }
+
+  // ---------- landing: views + expiring soon + recent ----------
+  var viewsCache = null;
+  function viewKey(name) { return name.replace(/[^\p{L}\p{N} ']/gu, "").trim().toLowerCase(); }
+  function loadViews() {
+    if (viewsCache) return viewsCache;
+    viewsCache = Promise.all([
+      api("/api/saved_views/?page_size=100"),
+      loadInboxTags().catch(function () { return []; })
+    ]).then(function (res) {
+      var d = res[0], inboxIds = res[1], views = [], seen = {};
+      d.results.forEach(function (v) {
+        var key = viewKey(v.name);
+        if (seen[key]) return; seen[key] = 1;
+        v.params = viewParams(v);
+        v.inbox = isInboxView(v, inboxIds);
+        views.push(v);
+      });
+      return Promise.all(views.map(function (v) {
+        if (!v.params) { v.count = null; return v; }
+        return api("/api/documents/?" + v.params + "&page_size=1&fields=id").then(function (r) { v.count = r.count; return v; }, function () { v.count = null; return v; });
+      }));
+    });
+    viewsCache.catch(function () { viewsCache = null; });
+    return viewsCache;
+  }
+
+  // ===== VIEWS: layout (groups and icons come from config.js) =====
+  function viewName(v) { return v.name.replace(/[^\p{L}\p{N} ']/gu, "").trim(); }
+  function viewButton(v) {
+    var n = viewName(v), key = n.toLowerCase();
+    // the inbox view opens the triage mode (where each document was filed + "Looks good")
+    return '<button type="button" class="view' + (v.inbox ? " inbox" : "") + '" ' + (v.inbox ? 'data-triage="1"' : 'data-view="' + v.id + '"') + '>' +
+      '<span class="ic"><svg><use href="#i-' + (v.inbox ? "inbox" : esc(CFG.viewIcons[key] || "doc")) + '"/></svg></span>' +
+      '<span class="name">' + esc(n) + '</span>' +
+      '<span class="count">' + (v.count == null ? "" : v.count) + '</span>' +
+      '<svg class="chev"><use href="#i-right"/></svg></button>';
+  }
+  function renderViews(views, target) {
+    var html = "", placed = {};
+    views.filter(function (v) { return v.inbox; }).forEach(function (v) {
+      placed[v.id] = 1;
+      if (v.count) html += '<div class="view-group"><div class="card">' + viewButton(v) + '</div></div>';
+    });
+    CFG.viewGroups.forEach(function (g) {
+      var wanted = g[1].map(function (s) { return s.toLowerCase(); });
+      var inside = views.filter(function (v) { return !placed[v.id] && wanted.indexOf(viewName(v).toLowerCase()) >= 0; });
+      inside.sort(function (a, b) { return wanted.indexOf(viewName(a).toLowerCase()) - wanted.indexOf(viewName(b).toLowerCase()); });
+      if (!inside.length) return;
+      inside.forEach(function (v) { placed[v.id] = 1; });
+      html += '<div class="view-group"><div class="view-group-title">' + esc(g[0]) + '</div><div class="card">' + inside.map(viewButton).join("") + '</div></div>';
+    });
+    var others = views.filter(function (v) { return !placed[v.id]; });
+    if (others.length) html += '<div class="view-group">' + (CFG.viewGroups.length ? '<div class="view-group-title">Other</div>' : '') +
+      '<div class="card">' + others.map(viewButton).join("") + '</div></div>';
+    target.innerHTML = html || '<div class="card" style="padding:16px;color:var(--sub)">No saved views yet. Create some in Paperless.</div>';
+  }
+  // ===== end VIEWS =====
+
+  // "Expiring soon": documents whose Date custom field (config: expiryField, name or id) is close or past.
+  function expiryFieldId() {
+    var f = CFG.expiryField;
+    if (f === "" || f == null) return Promise.resolve(null);
+    if (typeof f === "number" || /^\d+$/.test(String(f))) return Promise.resolve(Number(f));
+    return api("/api/custom_fields/?page_size=1000").then(function (d) {
+      var hit = d.results.filter(function (c) { return c.name.toLowerCase() === String(f).toLowerCase(); })[0];
+      return hit ? hit.id : null;
+    });
+  }
+  function loadExpiring(target, heading) {
+    var hide = function () { heading.remove(); target.remove(); };
+    return expiryFieldId().then(function (fid) {
+      if (fid == null) return hide();
+      return api("/api/documents/?custom_fields__id__all=" + fid + "&page_size=100&fields=id,title,custom_fields").then(function (d) {
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        var list = [];
+        d.results.forEach(function (x) {
+          (x.custom_fields || []).forEach(function (c) {
+            if (c.field !== fid || !c.value) return;
+            var days = Math.round((new Date(c.value + "T00:00:00") - today) / 864e5);
+            if (days <= CFG.expiryWindowDays) list.push({ id: x.id, title: x.title, date: c.value, days: days });
+          });
+        });
+        if (!list.length) return hide();
+        list.sort(function (a, b) { return a.days - b.days; });
+        target.innerHTML = list.slice(0, CFG.expiryMax).map(function (e) {
+          var when = e.days < 0 ? "expired " + (-e.days) + " d ago" : e.days === 0 ? "expires today" : e.days <= 60 ? "in " + e.days + " d" : fmtDate(e.date, true);
+          return '<button type="button" class="exp ' + (e.days < 0 ? "past" : e.days <= 30 ? "soon" : "") + '" data-id="' + e.id + '" data-title="' + esc(e.title) + '">' +
+            '<span class="name">' + esc(e.title) + '</span><span class="when">' + esc(when) + '</span></button>';
+        }).join("");
+      });
+    }).catch(hide);
+  }
+
+  function landing() {
+    if (location.search) history.replaceState(null, "", location.pathname);
+    statusEl.textContent = "";
+    content.innerHTML =
+      '<h2>Views</h2><div id="views"><div class="card" style="padding:16px;color:var(--sub)">Loading views…</div></div>' +
+      '<h2 id="exp-t">Expiring soon</h2><div class="card" id="exp"></div>' +
+      '<h2>Recently added</h2><div class="card" id="recent"></div>';
+    loadViews().then(function (views) { renderViews(views, $("views")); }).catch(function (e) { $("views").innerHTML = ""; showError(e); });
+    loadExpiring($("exp"), $("exp-t"));
+    docList($("recent"), "/api/documents/?ordering=-added", "No documents.", 8).catch(showError);
+  }
+
+  function openView(id, push) {
+    loadViews().then(function (views) {
+      var v = views.filter(function (x) { return String(x.id) === String(id); })[0];
+      if (!v) return landing();
+      if (!v.params) { window.open("/view/" + v.id, "_blank", "noopener"); return; }
+      if (push !== false) history.pushState({ view: v.id }, "", "?view=" + v.id);
+      statusEl.textContent = "";
+      content.innerHTML = '<div class="view-head"><button type="button" id="views-back"><svg><use href="#i-left"/></svg>Views</button>' +
+        '<span class="title">' + esc(viewName(v)) + '</span><span class="count">' + (v.count == null ? "" : v.count + " docs") + '</span></div><div class="card" id="list"></div>';
+      $("views-back").onclick = function () { history.back(); };
+      docList($("list"), "/api/documents/?" + v.params, "No documents in this view.").catch(showError);
+      window.scrollTo(0, 0);
+    }).catch(showError);
+  }
+
+  // ---------- inbox triage ----------
+  // Documents carrying an inbox tag: show where Paperless filed them. "Looks good" only removes the inbox tag
+  // (bulk_edit modify_tags), "Undo" puts it back. No Paperless workflow fires on this kind of edit
+  // (workflows trigger on consumption/added/updated document; check yours if you use "Document updated").
+  var inboxIds = [], pending = {}, done = {};
+  function modifyTags(id, add, remove) {
+    function send() {
+      return fetch("/api/documents/bulk_edit/", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-CSRFToken": PS.cookie("csrftoken") },
+        body: JSON.stringify({ documents: [Number(id)], method: "modify_tags", parameters: { add_tags: add, remove_tags: remove } })
+      });
+    }
+    // a missing or stale csrftoken gets one refresh from Paperless' own page
+    return PS.ensureCsrf().then(send).then(function (r) {
+      return r.status === 403 ? PS.refreshCsrf().then(send) : r;
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw "login";
+      if (!r.ok) throw "error " + r.status;
+    });
+  }
+  function filedAs(x) {
+    var c = names.corr[x.correspondent], t = names.type[x.document_type];
+    var tags = (x.tags || []).filter(function (i) { return inboxIds.indexOf(i) < 0; }).map(function (i) { return names.tag[i]; }).filter(Boolean);
+    return '<dt>Correspondent</dt>' + (c ? '<dd>' + esc(c) + '</dd>' : '<dd class="missing">none, to fill in</dd>') +
+      '<dt>Type</dt>' + (t ? '<dd>' + esc(t) + '</dd>' : '<dd class="missing">none, to fill in</dd>') +
+      '<dt>Tags</dt>' + (tags.length ? '<dd>' + tags.map(function (n) { return '<span class="chip">' + esc(n) + '</span>'; }).join("") + '</dd>' : '<dd class="missing">none</dd>') +
+      '<dt>Date</dt><dd>' + esc(fmtDate(x.created, true) || "?") + '</dd>';
+  }
+  function triageItem(x) {
+    return '<div class="item" id="item-' + x.id + '">' +
+      '<button class="doc" type="button" data-id="' + x.id + '" data-title="' + esc(x.title) + '">' +
+      '<img loading="lazy" src="/api/documents/' + x.id + '/thumb/" alt="" onerror="this.outerHTML=\'<span class=no-thumb></span>\'">' +
+      '<span class="info"><span class="t">' + esc(x.title) + '</span><span class="s">Added ' + esc(fmtDate(x.added, true)) + '</span></span></button>' +
+      '<dl class="filed">' + filedAs(x) + '</dl>' +
+      '<div class="actions"><button type="button" class="ok" data-ok="' + x.id + '"><svg><use href="#i-ok"/></svg>' + OK_LABEL + '</button>' +
+      '<a class="fix" href="/documents/' + x.id + '/details" target="_blank" rel="noopener"><svg><use href="#i-pencil"/></svg>Fix</a></div></div>';
+  }
+  function updateTriageCount() {
+    var n = Object.keys(pending).length, nb = $("triage-count"), list = $("list");
+    if (nb) nb.textContent = n ? n + " to sort" : "";
+    if (!list) return;
+    var empty = $("all-sorted");
+    if (!n && !empty) list.insertAdjacentHTML("afterend", '<div class="card" id="all-sorted" style="margin-top:12px"><div class="all-sorted"><svg><use href="#i-ok"/></svg><b>All sorted</b>Nothing left to check.</div></div>');
+    if (n && empty) empty.remove();
+    if (!list.children.length) list.hidden = true;
+  }
+  function accept(id) {
+    var x = pending[id]; if (!x) return Promise.resolve();
+    var removed = (x.tags || []).filter(function (i) { return inboxIds.indexOf(i) >= 0; });
+    var b = document.querySelector('[data-ok="' + id + '"]'); if (b) { b.disabled = true; b.lastChild.textContent = "One moment…"; }
+    return modifyTags(id, [], removed).then(function () {
+      delete pending[id]; viewsCache = null;
+      x.removed = removed;
+      var f = $("item-" + id);
+      if (f) f.outerHTML = '<div class="done" id="item-' + id + '"><svg><use href="#i-ok"/></svg><span><b>' + esc(x.title) + '</b> is filed</span>' +
+        '<button type="button" class="undo" data-undo="' + id + '">Undo</button></div>';
+      done[id] = x;
+      updateTriageCount();
+    }).catch(function (e) {
+      if (b) { b.disabled = false; b.lastChild.textContent = OK_LABEL; }
+      statusEl.innerHTML = e === "login"
+        ? "Paperless refused (session expired?). <a href=\"/\" target=\"_blank\" rel=\"noopener\">Open Paperless</a>, log in again, then retry."
+        : "Could not save (" + esc(e) + "). Try again in a moment.";
+      throw e;
+    });
+  }
+  function undo(id) {
+    var x = done[id]; if (!x) return;
+    var b = document.querySelector('[data-undo="' + id + '"]'); if (b) { b.disabled = true; b.textContent = "…"; }
+    modifyTags(id, x.removed, []).then(function () {
+      delete done[id]; pending[id] = x; viewsCache = null;
+      var f = $("item-" + id); if (f) f.outerHTML = triageItem(x);
+      $("list").hidden = false;
+      updateTriageCount();
+    }).catch(function (e) {
+      if (b) { b.disabled = false; b.textContent = "Undo"; }
+      statusEl.textContent = "Could not undo (" + (e === "login" ? "log in to Paperless again" : e) + ").";
+    });
+  }
+  function triage(push) {
+    if (push !== false) history.pushState({ triage: 1 }, "", "?inbox=1");
+    statusEl.textContent = "";
+    content.innerHTML = '<div class="view-head"><button type="button" id="views-back"><svg><use href="#i-left"/></svg>Views</button>' +
+      '<span class="title">Inbox</span><span class="count triage" id="triage-count"></span></div>' +
+      '<div class="card" id="list"><div style="padding:16px;color:var(--sub)">Loading…</div></div>';
+    $("views-back").onclick = function () {
+      if (history.state && history.state.triage) history.back(); else landing();   // opened directly from a link
+    };
+    window.scrollTo(0, 0);
+    loadInboxTags().then(function (ids) {
+      inboxIds = ids;
+      if (!inboxIds.length) throw "no inbox tag in Paperless";
+      return loadNames();
+    }).then(function () {
+      return api("/api/documents/?tags__id__in=" + inboxIds.join(",") + "&ordering=-added&page_size=100&fields=id,title,created,added,correspondent,document_type,tags");
+    }).then(function (d) {
+      pending = {}; done = {};
+      d.results.forEach(function (x) { pending[x.id] = x; });
+      $("list").innerHTML = d.results.map(triageItem).join("");
+      updateTriageCount();
+    }).catch(function (e) { $("list").hidden = true; showError(e); });
+  }
+
+  // ---------- search ----------
+  var timer = null, last = "";
+  function search(text, push) {
+    text = text.trim();
+    if (text === last && content.querySelector("#results")) return;
+    last = text;
+    field.classList.toggle("filled", !!q.value);
+    if (!text) { landing(); return; }
+    (push ? history.pushState : history.replaceState).call(history, { q: text }, "", "?q=" + encodeURIComponent(text));
+    statusEl.textContent = "Searching…";
+    content.innerHTML = '<div class="card" id="results"></div>';
+    var target = $("results");
+    api("/api/documents/?query=" + encodeURIComponent(text) + "&page_size=25&fields=" + FIELDS).then(function (d) {
+      if (d.count) return d;
+      // full-text search sometimes misses partial words: retry on title + content
+      return api("/api/documents/?title_content=" + encodeURIComponent(text) + "&ordering=-created&page_size=25&fields=" + FIELDS);
+    }).then(function (d) {
+      if (text !== last) return;
+      return loadNames().then(function () {
+        statusEl.textContent = d.count ? d.count + " document" + (d.count > 1 ? "s" : "") : "";
+        if (!d.count) { target.outerHTML = '<div class="card" id="results" style="padding:18px;color:var(--sub)">No document for "' + esc(text) + '".</div>'; return; }
+        target.innerHTML = d.results.map(docRow).join("");
+        if (d.count > d.results.length) target.insertAdjacentHTML("beforeend", '<div style="padding:12px;color:var(--sub);font-size:14px;border-top:1px solid var(--line)">Showing the ' + d.results.length + ' most relevant: refine the search to see the others.</div>');
+      });
+    }).catch(showError);
+  }
+  q.addEventListener("input", function () {
+    field.classList.toggle("filled", !!q.value);
+    clearTimeout(timer);
+    timer = setTimeout(function () { search(q.value, false); }, 450);
+  });
+  $("f").addEventListener("submit", function (ev) { ev.preventDefault(); clearTimeout(timer); q.blur(); search(q.value, true); });
+  $("clear").addEventListener("click", function () { q.value = ""; search("", false); q.focus(); });
+
+  // ---------- viewer ----------
+  var viewer = $("viewer"), pagesEl = $("viewer-pages"), lastFocus = null, renderId = 0, zoom = false, ignorePop = false;
+  function openDoc(id, title, push) {
+    lastFocus = document.activeElement;
+    $("viewer-t").textContent = title || "Document";
+    $("viewer-dl").href = "/api/documents/" + id + "/download/";
+    $("viewer-pl").href = "/documents/" + id + "/details";
+    zoom = false; $("viewer-zoom").setAttribute("aria-pressed", "false");
+    var x = pending[id];   // document still waiting in the inbox: show how it was filed + "Looks good"
+    $("viewer-triage").hidden = !x;
+    if (x) {
+      $("viewer-filed").innerHTML = filedAs(x);
+      $("viewer-fix").href = "/documents/" + id + "/details";
+      $("viewer-ok").disabled = false; $("viewer-ok").lastChild.textContent = OK_LABEL;
+      $("viewer-ok").onclick = function () {
+        var button = this;
+        button.disabled = true; button.lastChild.textContent = "One moment…";
+        accept(id).then(function () { closeDoc(false); }, function () { button.disabled = false; button.lastChild.textContent = OK_LABEL; closeDoc(false); });
+      };
+    }
+    viewer.classList.add("open"); document.body.style.overflow = "hidden";
+    if (push !== false) history.pushState({ doc: id, title: title }, "", location.search + (location.search ? "&" : "?") + "doc=" + id);
+    $("viewer-close").focus();
+    draw(id);
+  }
+  function draw(id) {
+    var mine = ++renderId;
+    pagesEl.innerHTML = '<div class="msg">Loading…</div>';
+    fetch("/api/documents/" + id + "/preview/", { credentials: "same-origin" }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw "login";
+      if (!r.ok) throw "error " + r.status;
+      var type = r.headers.get("content-type") || "";
+      return r.arrayBuffer().then(function (data) { return { type: type, data: data }; });
+    }).then(function (o) {
+      if (mine !== renderId) return;
+      if (o.type.indexOf("image/") === 0) {
+        pagesEl.innerHTML = ""; var img = document.createElement("img"); img.alt = "";
+        img.src = URL.createObjectURL(new Blob([o.data], { type: o.type })); pagesEl.appendChild(img); return;
+      }
+      return PS.loadPdfjs().then(function (pdfjsLib) { return pdfjsLib.getDocument({ data: o.data }).promise; }).then(function (pdf) {
+        if (mine !== renderId) return;
+        pagesEl.innerHTML = "";
+        var width = Math.min(pagesEl.clientWidth - 20, 900) * (zoom ? 2 : 1) * (window.devicePixelRatio || 1);
+        var n = 1;
+        function next() {
+          if (n > pdf.numPages || mine !== renderId) return;
+          return pdf.getPage(n++).then(function (page) {
+            var v1 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: width / v1.width });
+            var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+            if (zoom) { c.style.width = "200%"; c.style.maxWidth = "none"; }
+            pagesEl.appendChild(c);
+            return page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise.then(next);
+          });
+        }
+        return next();
+      });
+    }).catch(function (e) {
+      if (mine !== renderId) return;
+      pagesEl.innerHTML = '<div class="msg">' + (e === "login" ? "Log in to Paperless, then try again." : "The document could not be displayed (" + esc(e) + "). Try Download instead.") + '</div>';
+    });
+  }
+  function closeDoc(fromHistory) {
+    if (!viewer.classList.contains("open")) return;
+    renderId++; viewer.classList.remove("open"); document.body.style.overflow = ""; pagesEl.innerHTML = "";
+    if (!fromHistory) { ignorePop = true; history.back(); }
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  $("viewer-close").onclick = function () { closeDoc(false); };
+  $("viewer-zoom").onclick = function () {
+    zoom = !zoom; this.setAttribute("aria-pressed", String(zoom));
+    var st = history.state; if (st && st.doc) draw(st.doc);
+  };
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && viewer.classList.contains("open")) closeDoc(false);
+    if (e.key === "Tab" && viewer.classList.contains("open")) {   // keep focus inside the viewer
+      var f = viewer.querySelectorAll("button,a[href]"), a = f[0], z = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+  });
+
+  // ---------- clicks ----------
+  content.addEventListener("click", function (e) {
+    var o = e.target.closest("[data-ok]");
+    if (o) { accept(o.getAttribute("data-ok")).catch(function () {}); return; }
+    var u = e.target.closest("[data-undo]");
+    if (u) { undo(u.getAttribute("data-undo")); return; }
+    var t = e.target.closest("[data-triage]");
+    if (t) { triage(true); return; }
+    var d = e.target.closest("[data-id]");
+    if (d) { openDoc(d.getAttribute("data-id"), d.getAttribute("data-title")); return; }
+    var v = e.target.closest("[data-view]");
+    if (v) openView(v.getAttribute("data-view"), true);
+  });
+
+  // ---------- history (phone back button) ----------
+  function fromUrl() {
+    if (ignorePop) { ignorePop = false; return; }   // back triggered by closing the viewer
+    var p = new URLSearchParams(location.search);
+    // back while the viewer is open: only close it, the list underneath stays as is
+    if (viewer.classList.contains("open") && !p.get("doc")) { closeDoc(true); return; }
+    if (p.get("doc")) return;
+    if (p.get("q")) { q.value = p.get("q"); field.classList.add("filled"); last = ""; search(p.get("q"), false); }
+    else if (p.get("inbox")) { q.value = ""; field.classList.remove("filled"); if (!$("triage-count")) triage(false); }
+    else if (p.get("view")) { q.value = ""; field.classList.remove("filled"); openView(p.get("view"), false); }
+    else { q.value = ""; field.classList.remove("filled"); last = ""; landing(); }
+  }
+  window.addEventListener("popstate", fromUrl);
+  // on first load, a leftover ?doc= in the URL is dropped (the list is shown)
+  (function () { var p = new URLSearchParams(location.search); if (p.get("doc")) { p.delete("doc"); history.replaceState(null, "", location.pathname + (p.toString() ? "?" + p : "")); } })();
+  fromUrl();
+})();
+</script>
+</body>
+</html>

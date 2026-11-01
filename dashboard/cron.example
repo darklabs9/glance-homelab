@@ -1,0 +1,17 @@
+# /etc/cron.d/glance-dashboard  (system crontab format: there is a user field)
+# Adjust the paths. Every script reads scripts/config.env. Logs go wherever you like.
+D=/opt/glance-homelab/dashboard/scripts
+L=/var/log/glance-dashboard
+
+# Home page
+*/5 * * * *   root  /usr/bin/python3 $D/weather_hours.py   >> $L/weather_hours.log 2>&1
+*/5 * * * *   root  /usr/bin/python3 $D/agenda_days.py     >> $L/agenda_days.log 2>&1
+*/5 * * * *   root  /usr/bin/python3 $D/home.py            >> $L/home.log 2>&1
+*/5 * * * *   root  /usr/bin/python3 $D/appliance_stats.py >> $L/appliance_stats.log 2>&1
+*/5 * * * *   root  /usr/bin/python3 $D/meters.py          >> $L/meters.log 2>&1
+
+# Media page
+*/10 * * * *  root  /usr/bin/python3 $D/media.py           >> $L/media.log 2>&1
+*/2 * * * *   root  /usr/bin/python3 $D/downloads.py       >> $L/downloads.log 2>&1
+*/30 * * * *  root  /usr/bin/python3 $D/media_news.py      >> $L/media_news.log 2>&1
+17 */6 * * *  root  /usr/bin/python3 $D/ratings.py         >> $L/ratings.log 2>&1

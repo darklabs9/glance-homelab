@@ -1,0 +1,1006 @@
+{
+ "generated": "2026-11-01T22:07:02",
+ "generated_ts": 1793567222,
+ "labels": {
+  "host": "NAS",
+  "host_ip": "192.168.1.10",
+  "isp": "Internet",
+  "router": "Router",
+  "router_ip": "192.168.1.1",
+  "short_prefix": "192.168.1.",
+  "logs_url": "https://dozzle.example.lan/",
+  "ups_note": "clean shutdown below 15 %"
+ },
+ "groups": [
+  {
+   "id": "entry",
+   "title": "Front door",
+   "entry": true
+  },
+  {
+   "id": "media",
+   "title": "Media"
+  },
+  {
+   "id": "home",
+   "title": "Home"
+  },
+  {
+   "id": "monitoring",
+   "title": "Monitoring"
+  },
+  {
+   "id": "tools",
+   "title": "Tools"
+  },
+  {
+   "id": "other",
+   "title": "Other"
+  }
+ ],
+ "services": [
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "3 h",
+   "image": "example/caddy:latest",
+   "version": "1.0.0",
+   "ip": "192.168.1.20",
+   "cpu": "0.00 %",
+   "ram": "1.0 GB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Caddy",
+   "c": "caddy",
+   "group": "entry",
+   "desc": "Reverse proxy, HTTPS for every *.example.lan",
+   "sensitive": "access to every web app",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "20 h",
+   "image": "example/authentik-server:latest",
+   "version": "2.1.1",
+   "ip": "172.20.0.3 (internal)",
+   "cpu": "0.70 %",
+   "ram": "63 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Authentik",
+   "c": "authentik-server",
+   "group": "entry",
+   "desc": "Single sign-on",
+   "sensitive": "logins to every app",
+   "hidden": false,
+   "deps": [
+    "authentik-worker",
+    "authentik-postgres",
+    "authentik-redis"
+   ]
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "3 d",
+   "image": "example/pihole:latest",
+   "version": "2.5.5",
+   "ip": "192.168.1.25",
+   "cpu": "3.50 %",
+   "ram": "155 MB",
+   "url": "",
+   "updated": "26 Oct",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Pi-hole",
+   "c": "pihole",
+   "group": "entry",
+   "desc": "DNS + ad blocking",
+   "sensitive": "DNS for the whole network",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "4 d",
+   "image": "example/tailscale:latest",
+   "version": "3.6.6",
+   "ip": "host network",
+   "cpu": "0.20 %",
+   "ram": "1.6 GB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Tailscale",
+   "c": "tailscale",
+   "group": "entry",
+   "desc": "Remote access",
+   "sensitive": "remote access",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "5 d",
+   "image": "example/jellyfin:latest",
+   "version": "4.7.7",
+   "ip": "192.168.1.27",
+   "cpu": "0.90 %",
+   "ram": "201 MB",
+   "url": "https://jellyfin.example.lan",
+   "updated": "01 Nov",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Jellyfin",
+   "c": "jellyfin",
+   "group": "media",
+   "desc": "Movies and series",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "5 d",
+   "image": "example/sonarr:latest",
+   "version": "1.8.8",
+   "ip": "192.168.1.28",
+   "cpu": "1.60 %",
+   "ram": "224 MB",
+   "url": "",
+   "updated": "31 Oct",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Sonarr",
+   "c": "sonarr",
+   "group": "media",
+   "desc": "Series",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "6 d",
+   "image": "example/radarr:latest",
+   "version": "2.9.9",
+   "ip": "192.168.1.29",
+   "cpu": "2.30 %",
+   "ram": "247 MB",
+   "url": "",
+   "updated": "31 Oct",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Radarr",
+   "c": "radarr",
+   "group": "media",
+   "desc": "Movies",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "7 d",
+   "image": "example/prowlarr:latest",
+   "version": "3.0.10",
+   "ip": "192.168.1.30",
+   "cpu": "3.00 %",
+   "ram": "270 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Prowlarr",
+   "c": "prowlarr",
+   "group": "media",
+   "desc": "Indexers",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "exited",
+   "health": "none",
+   "up": "stopped",
+   "image": "example/jellyseerr:latest",
+   "version": "4.1.11",
+   "ip": "192.168.1.31",
+   "cpu": "—",
+   "ram": "—",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Jellyseerr",
+   "c": "jellyseerr",
+   "group": "media",
+   "desc": "Requests",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "9 d",
+   "image": "example/homeassistant:latest",
+   "version": "2.3.13",
+   "ip": "host network",
+   "cpu": "1.10 %",
+   "ram": "339 MB",
+   "url": "",
+   "updated": "29 Oct",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Home Assistant",
+   "c": "homeassistant",
+   "group": "home",
+   "desc": "Home automation",
+   "sensitive": "home automation",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "10 d",
+   "image": "example/paperless:latest",
+   "version": "3.4.14",
+   "ip": "192.168.1.34",
+   "cpu": "1.80 %",
+   "ram": "362 MB",
+   "url": "",
+   "updated": "",
+   "update_available": true,
+   "update_to": "2.14.0",
+   "restart_policy": "unless-stopped",
+   "name": "Paperless-ngx",
+   "c": "paperless",
+   "group": "home",
+   "desc": "Documents",
+   "sensitive": "",
+   "hidden": false,
+   "deps": [
+    "paperless-postgres",
+    "paperless-redis"
+   ]
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "12 d",
+   "image": "example/mealie:latest",
+   "version": "2.7.17",
+   "ip": "192.168.1.37",
+   "cpu": "3.90 %",
+   "ram": "431 MB",
+   "url": "",
+   "updated": "01 Nov",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Mealie",
+   "c": "mealie",
+   "group": "home",
+   "desc": "Recipes and shopping list",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "12 d",
+   "image": "example/vaultwarden:latest",
+   "version": "3.8.18",
+   "ip": "192.168.1.38",
+   "cpu": "0.60 %",
+   "ram": "2.8 GB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Vaultwarden",
+   "c": "vaultwarden",
+   "group": "home",
+   "desc": "Passwords",
+   "sensitive": "the password vault",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "13 d",
+   "image": "example/uptime-kuma:latest",
+   "version": "4.9.19",
+   "ip": "192.168.1.39",
+   "cpu": "1.30 %",
+   "ram": "477 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Uptime Kuma",
+   "c": "uptime-kuma",
+   "group": "monitoring",
+   "desc": "Uptime checks",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "14 d",
+   "image": "example/dozzle:latest",
+   "version": "1.0.20",
+   "ip": "192.168.1.40",
+   "cpu": "2.00 %",
+   "ram": "500 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Dozzle",
+   "c": "dozzle",
+   "group": "monitoring",
+   "desc": "Container logs",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "15 d",
+   "image": "example/ntfy:latest",
+   "version": "2.1.21",
+   "ip": "192.168.1.41",
+   "cpu": "2.70 %",
+   "ram": "523 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "ntfy",
+   "c": "ntfy",
+   "group": "monitoring",
+   "desc": "Push notifications",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "15 d",
+   "image": "example/glance:latest",
+   "version": "3.2.22",
+   "ip": "192.168.1.42",
+   "cpu": "3.40 %",
+   "ram": "546 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Glance",
+   "c": "glance",
+   "group": "tools",
+   "desc": "This dashboard",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "16 d",
+   "image": "example/kopia:latest",
+   "version": "4.3.23",
+   "ip": "172.20.0.25 (internal)",
+   "cpu": "0.10 %",
+   "ram": "569 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Kopia",
+   "c": "kopia",
+   "group": "tools",
+   "desc": "Backups",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "17 d",
+   "image": "example/watchtower:latest",
+   "version": "1.4.24",
+   "ip": "172.20.0.26 (internal)",
+   "cpu": "0.80 %",
+   "ram": "3.4 GB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "Watchtower",
+   "c": "watchtower",
+   "group": "tools",
+   "desc": "Image updates",
+   "sensitive": "",
+   "hidden": true,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "unhealthy",
+   "up": "19 d",
+   "image": "example/freshrss:latest",
+   "version": "4.7.27",
+   "ip": "192.168.1.47",
+   "cpu": "2.90 %",
+   "ram": "661 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "FreshRSS",
+   "c": "freshrss",
+   "group": "tools",
+   "desc": "RSS reader",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  },
+  {
+   "state": "running",
+   "health": "none",
+   "up": "17 d",
+   "image": "example/immich-server:latest",
+   "version": "2.5.25",
+   "ip": "192.168.1.45",
+   "cpu": "1.50 %",
+   "ram": "615 MB",
+   "url": "",
+   "updated": "23 Oct",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "immich-server",
+   "c": "immich-server",
+   "group": "other",
+   "desc": "",
+   "sensitive": "",
+   "hidden": false,
+   "deps": [
+    "immich-postgres"
+   ]
+  },
+  {
+   "state": "running",
+   "health": "healthy",
+   "up": "8 d",
+   "image": "example/qbittorrent:latest",
+   "version": "1.2.12",
+   "ip": "via b9e89560dd48",
+   "cpu": "0.40 %",
+   "ram": "2.2 GB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped",
+   "name": "qbittorrent",
+   "c": "qbittorrent",
+   "group": "other",
+   "desc": "",
+   "sensitive": "",
+   "hidden": false,
+   "deps": []
+  }
+ ],
+ "deps": {
+  "authentik-worker": {
+   "state": "running",
+   "health": "none",
+   "up": "37 h",
+   "image": "example/authentik-worker:latest",
+   "version": "3.2.2",
+   "ip": "172.20.0.4 (internal)",
+   "cpu": "1.40 %",
+   "ram": "86 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  },
+  "authentik-postgres": {
+   "state": "running",
+   "health": "healthy",
+   "up": "2 d",
+   "image": "example/authentik-postgres:latest",
+   "version": "4.3.3",
+   "ip": "172.20.0.5 (internal)",
+   "cpu": "2.10 %",
+   "ram": "109 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  },
+  "authentik-redis": {
+   "state": "running",
+   "health": "none",
+   "up": "2 d",
+   "image": "example/authentik-redis:latest",
+   "version": "1.4.4",
+   "ip": "172.20.0.6 (internal)",
+   "cpu": "2.80 %",
+   "ram": "132 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  },
+  "paperless-postgres": {
+   "state": "running",
+   "health": "healthy",
+   "up": "10 d",
+   "image": "example/paperless-postgres:latest",
+   "version": "4.5.15",
+   "ip": "172.20.0.17 (internal)",
+   "cpu": "2.50 %",
+   "ram": "385 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  },
+  "paperless-redis": {
+   "state": "running",
+   "health": "none",
+   "up": "11 d",
+   "image": "example/paperless-redis:latest",
+   "version": "1.6.16",
+   "ip": "172.20.0.18 (internal)",
+   "cpu": "3.20 %",
+   "ram": "408 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  },
+  "immich-postgres": {
+   "state": "running",
+   "health": "none",
+   "up": "18 d",
+   "image": "example/immich-postgres:latest",
+   "version": "3.6.26",
+   "ip": "172.20.0.28 (internal)",
+   "cpu": "2.20 %",
+   "ram": "638 MB",
+   "url": "",
+   "updated": "",
+   "update_available": false,
+   "update_to": "",
+   "restart_policy": "unless-stopped"
+  }
+ },
+ "system": {
+  "ups": {
+   "state": "mains",
+   "charge": 100,
+   "load": 18
+  },
+  "raid": [
+   {
+    "name": "md1",
+    "level": "raid1",
+    "status": "UU"
+   }
+  ],
+  "disk_temps": [
+   36,
+   38
+  ],
+  "disk": {
+   "used": 2.1,
+   "total": 3.6,
+   "pct": 58
+  },
+  "cpu_temp": 47,
+  "load1": 1.2,
+  "load15": 0.9,
+  "containers": {
+   "total": 28,
+   "running": 27
+  },
+  "ram": {
+   "used": 9.4,
+   "total": 16
+  },
+  "uptime_days": 12
+ },
+ "internet": {
+  "down": 512,
+  "up": 41,
+  "ping": 11,
+  "outages_7d": 2,
+  "last_outage": "today 19:06",
+  "wifi_last": "today 21:06 (40 s)"
+ },
+ "backup": {
+  "label": "Kopia offsite backup",
+  "last": "this morning 03:30",
+  "age_h": 18.6,
+  "max_age_h": 30.0
+ },
+ "updates": {
+  "available": [
+   {
+    "c": "paperless",
+    "current": "2.13.4",
+    "latest": "2.14.0"
+   }
+  ],
+  "recent": [
+   {
+    "c": "mealie",
+    "from": "1.9.0",
+    "to": "2.7.17",
+    "when": "1 min ago"
+   },
+   {
+    "c": "jellyfin",
+    "from": "10.10.6",
+    "to": "10.10.7",
+    "when": "today 20:06"
+   },
+   {
+    "c": "radarr",
+    "from": "5.20.1",
+    "to": "5.21.0",
+    "when": "yesterday 20:06"
+   },
+   {
+    "c": "sonarr",
+    "from": "4.0.14",
+    "to": "4.0.15",
+    "when": "yesterday 20:06"
+   },
+   {
+    "c": "homeassistant",
+    "from": "2026.10.3",
+    "to": "2026.10.4",
+    "when": "Thu 20:06"
+   },
+   {
+    "c": "pihole",
+    "from": "2025.10.1",
+    "to": "2025.10.2",
+    "when": "Mon 20:06"
+   },
+   {
+    "c": "immich-server",
+    "from": "2.1.0",
+    "to": "2.2.0",
+    "when": "23 Oct"
+   }
+  ]
+ },
+ "tasks": [
+  {
+   "name": "backup",
+   "last": "this morning 03:30",
+   "key": true,
+   "crons": [
+    [
+     "30",
+     "3",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "daily 03:30",
+   "script": "/opt/scripts/backup-configs.sh",
+   "desc": "Copies compose files and app configs to the backup share, keeps 14 days.",
+   "next": "2026-11-02T03:30",
+   "freq": "scheduled"
+  },
+  {
+   "name": "certs-renew",
+   "last": "yesterday 23:00",
+   "key": false,
+   "crons": [
+    [
+     "0",
+     "23",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "daily 23:00",
+   "script": "/usr/local/bin/renew-certs",
+   "desc": "Renews the reverse proxy TLS certificates when they expire within 30 days.",
+   "next": "2026-11-01T23:00",
+   "freq": "scheduled"
+  },
+  {
+   "name": "docker-prune",
+   "last": "Oct 25 04:15",
+   "key": false,
+   "crons": [
+    [
+     "15",
+     "4",
+     "*",
+     "*",
+     "0"
+    ]
+   ],
+   "schedule": "Sunday 04:15",
+   "script": "/opt/scripts/docker-prune.sh",
+   "desc": "Removes dangling images and build cache once a week.",
+   "next": "2026-11-08T04:15",
+   "freq": "scheduled"
+  },
+  {
+   "name": "media-cleanup",
+   "last": "today 17:00",
+   "key": false,
+   "crons": [
+    [
+     "0",
+     "5,17",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "daily at 05:00, 17:00",
+   "script": "/opt/scripts/media-cleanup.py",
+   "desc": "Deletes watched episodes older than 30 days from the media library.",
+   "next": "2026-11-02T05:00",
+   "freq": "scheduled"
+  },
+  {
+   "name": "nas-state",
+   "last": "1 min ago",
+   "key": true,
+   "crons": [
+    [
+     "*",
+     "*",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "every minute",
+   "script": "/opt/scripts/nas-state.py",
+   "desc": "Collects the state of the host for the Glance NAS page.",
+   "next": "2026-11-01T22:08",
+   "freq": "continuous"
+  },
+  {
+   "name": "smart-check",
+   "last": "Oct 1 02:00",
+   "key": false,
+   "crons": [
+    [
+     "0",
+     "2",
+     "1-7",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "days 1 to 7 of the month at 02:00",
+   "script": "/opt/scripts/smart-check.sh",
+   "desc": "Runs a short SMART self-test on every disk and logs the result.",
+   "next": "2026-11-02T02:00",
+   "freq": "scheduled"
+  },
+  {
+   "name": "speedtest",
+   "last": "6 min ago",
+   "key": false,
+   "crons": [
+    [
+     "*/30",
+     "*",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "every 30 min",
+   "script": "/opt/scripts/speedtest-export.sh",
+   "desc": "Exports the latest Speedtest Tracker result as JSON for Glance.",
+   "next": "2026-11-01T22:30",
+   "freq": "continuous"
+  },
+  {
+   "name": "wifi-ping",
+   "last": "1 min ago",
+   "key": false,
+   "crons": [
+    [
+     "*",
+     "*",
+     "*",
+     "*",
+     "*"
+    ]
+   ],
+   "schedule": "every minute",
+   "script": "/opt/scripts/wifi-ping.py",
+   "desc": "Wi-Fi micro-outage logger: pings a few always-on devices every 10 s.",
+   "next": "2026-11-01T22:08",
+   "freq": "continuous"
+  }
+ ],
+ "links": [
+  {
+   "t": "Uptime Kuma",
+   "u": "https://uptime.example.lan"
+  },
+  {
+   "t": "Dozzle",
+   "u": "https://dozzle.example.lan"
+  },
+  {
+   "t": "Beszel",
+   "u": "https://beszel.example.lan"
+  }
+ ],
+ "outages": {
+  "events": [
+   {
+    "t": "2026-11-01T21:06",
+    "type": "wifi",
+    "s": 40,
+    "note": "micro-outage"
+   },
+   {
+    "t": "2026-11-01T19:06",
+    "type": "wifi",
+    "s": 22,
+    "note": "at the same time as internet"
+   },
+   {
+    "t": "2026-11-01T19:06",
+    "type": "net",
+    "s": 50,
+    "note": "micro-outage"
+   },
+   {
+    "t": "2026-10-30T14:06",
+    "type": "wifi",
+    "s": 95,
+    "note": ""
+   },
+   {
+    "t": "2026-10-27T18:06",
+    "type": "wifi",
+    "s": 1300,
+    "note": "the router did not answer either"
+   },
+   {
+    "t": "2026-10-27T18:06",
+    "type": "net",
+    "s": 1260,
+    "note": "after the power cut"
+   },
+   {
+    "t": "2026-10-27T18:05",
+    "type": "power",
+    "s": 250,
+    "note": ""
+   },
+   {
+    "t": "2026-10-23T16:06",
+    "type": "wifi",
+    "s": 30,
+    "note": "micro-outage"
+   },
+   {
+    "t": "2026-10-21T15:06",
+    "type": "net",
+    "s": 35,
+    "note": "micro-outage"
+   },
+   {
+    "t": "2026-10-18T20:06",
+    "type": "wifi",
+    "s": 600,
+    "note": ""
+   },
+   {
+    "t": "2026-10-13T20:06",
+    "type": "net",
+    "s": 300,
+    "note": ""
+   },
+   {
+    "t": "2026-10-11T11:06",
+    "type": "wifi",
+    "s": 45,
+    "note": "micro-outage"
+   },
+   {
+    "t": "2026-10-05T13:06",
+    "type": "wifi",
+    "s": 18,
+    "note": "micro-outage"
+   }
+  ],
+  "ongoing": [],
+  "sources": {
+   "net": true,
+   "wifi": true,
+   "power": true
+  }
+ },
+ "problems": [
+  {
+   "id": "stopped:jellyseerr",
+   "level": "down",
+   "title": "jellyseerr is stopped",
+   "detail": "it should be running"
+  },
+  {
+   "id": "health:freshrss",
+   "level": "down",
+   "title": "freshrss is unhealthy",
+   "detail": "its health check fails"
+  },
+  {
+   "id": "update:paperless",
+   "level": "info",
+   "title": "Update available for paperless",
+   "detail": "2.13.4 → 2.14.0"
+  }
+ ]
+}

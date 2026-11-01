@@ -1,0 +1,380 @@
+# Glance config for the Home and Media pages of glance-homelab.
+# Only these two pages are here. The NAS page lives in its own module: ../nas-tab
+# (add its "- name: NAS" page block under "pages:" below).
+#
+# ${...} values are environment variables of the Glance container (see config.example.env, "Glance" part).
+# Every custom-api widget reads a JSON file written by a script of ./scripts (cron: see cron.example) into
+# <assets>/data, which Glance serves itself at /assets/data.
+
+server:
+  assets-path: /app/assets
+
+document:
+  head: |
+    <script src="/assets/live.js?v=1" defer></script>
+    <script src="/assets/icons.js?v=1" defer></script>
+    <script src="/assets/webhooks.js?v=1" defer></script>
+    <link rel="stylesheet" href="/assets/home.css?v=1">
+    <script src="/assets/sky.js?v=1" defer></script>
+    <link rel="stylesheet" href="/assets/sky.css?v=1">
+    <script src="/assets/agenda.js?v=1" defer></script>
+    <link rel="stylesheet" href="/assets/agenda.css?v=1">
+    <link rel="stylesheet" href="/assets/fonts.css?v=1">
+    <link rel="stylesheet" href="/assets/media.css?v=1">
+
+theme:
+  custom-css-file: /assets/user.css
+  background-color: 225 14 11
+  primary-color: 210 90 64
+  contrast-multiplier: 1.1
+
+pages:
+  - name: Home
+    slug: home
+    columns:
+      - size: full
+        widgets:
+          # Animated sky (assets/sky.js + sky.css). Data: scripts/weather_hours.py.
+          # The hidden <input> keeps live.js from replacing this widget (the canvas would be recreated every minute);
+          # sky.js re-reads data-src every 10 min itself. Without JS, the rain alert text stays readable.
+          - type: custom-api
+            title: Weather
+            hide-header: true
+            cache: 5m
+            url: ${DATA_URL}/weather.json
+            template: |
+              <div class="ciel" data-ciel data-src="/assets/data/weather-sky.json" data-brut="{{ .JSON.String "brut" }}">
+                <p class="ciel-repli">{{ .JSON.String "alerte.texte" }}{{ if ne (.JSON.String "vigilance.texte") "" }} · {{ .JSON.String "vigilance.texte" }}{{ end }}</p>
+                <input type="hidden" class="ciel-garde">
+              </div>
+
+          # To do: only actions (scripts/home.py). Empty list = the card disappears (CSS :has(.acc-todo-vide)).
+          # Keep the .acc-col class: webhooks.js looks for the "Done" rows in it.
+          - type: custom-api
+            title: To do
+            hide-header: true
+            cache: 1m
+            url: ${DATA_URL}/home.json
+            template: |
+              {{ $todo := .JSON.Array "todo" }}
+              {{ if eq (len $todo) 0 }}<div class="acc-todo-vide"></div>{{ else }}
+              <div class="acc-col acc-todo">
+                <div class="acc-card acc-cd">
+                  <div class="acc-ch"><span>To do</span><span>{{ len $todo }}</span></div>
+                  {{ range $todo }}{{ $q := .String "quoi" }}
+                  <div class="acc-row"><div class="acc-chip t-{{ .String "type" }}">{{ .String "icone" }}</div>
+                    <div class="acc-tx"><div class="t {{ if ge (.Int "urgence") 2 }}color-negative{{ end }}">{{ if ne (.String "lien") "" }}<a href="{{ .String "lien" }}" target="_blank" style="color:inherit;text-decoration:none;">{{ $q }} ›</a>{{ else }}{{ $q }}{{ end }}</div>{{ if ne (.String "detail") "" }}<div class="s">{{ .String "detail" }}</div>{{ end }}</div>
+                    {{ if ne (.String "bouton") "" }}<form method="post" action="{{ .String "bouton" }}" target="webhook-sink" style="margin:0;"><button type="submit" class="acc-tdb" onclick="this.textContent=(this.textContent.indexOf('Done')>=0?'✓ Noted':'✓ Started');this.disabled=true;this.form.submit();" style="border:0;border-radius:8px;padding:9px 16px;font-size:0.95rem;font-weight:700;color:#fff;background:hsl(140,55%,36%);cursor:pointer;font-family:inherit;min-width:92px;">{{ if eq (.String "bouton_txt") "Done" }}✓{{ else }}▶{{ end }} {{ .String "bouton_txt" }}</button></form>{{ end }}</div>
+                  {{ end }}<iframe name="webhook-sink" style="display:none;"></iframe>
+                </div>
+              </div>{{ end }}
+
+          # Two quick buttons: Documents -> Paperless search page (../paperless-search), Groceries -> offline grocery
+          # app (../offline-grocery) with the number of items left on the Mealie list.
+          - type: custom-api
+            title: Tools
+            hide-header: true
+            cache: 1m
+            url: ${DATA_URL}/home.json
+            template: |
+              {{ $n := (.JSON.Get "courses").Int "restants" }}
+              <div class="acc-btns2">
+                <a class="acc-bt2" href="${PAPERLESS_SEARCH_URL}" target="_blank"><span class="acc-bt2-ic">📄</span>Documents</a>
+                <a class="acc-bt2" href="${GROCERY_URL}" target="_blank"><span class="acc-bt2-ic">🛒</span>Groceries{{ if gt $n 0 }}<span class="acc-bt2-n">{{ $n }}</span>{{ end }}</a>
+              </div>
+
+          # Agenda grouped by day (scripts/agenda_days.py, assets/agenda.js + agenda.css). Grey = AGENDA_OTHER_CALENDARS.
+          - type: custom-api
+            title: Agenda
+            hide-header: true
+            cache: 1m
+            url: ${DATA_URL}/agenda.json
+            template: |
+              {{ $n := .JSON.Int "nb_jours" }}
+              <div class="ag">
+                <div class="ag-tete"><div class="ag-titre">Agenda</div><span class="ag-nbj">{{ if gt $n 0 }}next {{ $n }} day{{ if gt $n 1 }}s{{ end }}{{ end }}</span></div>
+                <div class="ag-liste">
+                {{ if eq $n 0 }}<div class="ag-rien">Nothing planned in the next {{ .JSON.Int "horizon" }} days.</div>{{ end }}
+                {{ range .JSON.Array "jours" }}
+                  <div class="ag-jour{{ if eq (.Int "ecart") 0 }} auj{{ end }}" data-date="{{ .String "date" }}">
+                    <div class="ag-jdate"><b>{{ .Int "num" }}</b><span>{{ .String "abbr" }}</span></div>
+                    <div class="ag-jcorps">
+                      <div class="ag-jmt">{{ .String "quand" }}{{ if ne (.String "meteo_t") "" }} · {{ .String "meteo_t" }}{{ end }}{{ if ne (.String "meteo_txt") "" }} · <span class="{{ .String "meteo_cls" }}">{{ .String "meteo_txt" }}</span>{{ end }}</div>
+                      {{ range .Array "evs" }}<div class="ag-ev{{ if not (.Bool "perso") }} autre{{ end }}"{{ if gt (.Int "debut_ts") 0 }} data-debut="{{ .Int "debut_ts" }}" data-fin="{{ .Int "fin_ts" }}"{{ end }}>{{ if eq (.String "heure") "" }}<div class="ag-h jr">all day</div>{{ else }}<div class="ag-h">{{ .String "heure" }}</div>{{ end }}<div class="ag-tx"><div class="ag-t">{{ .String "quoi" }}</div><div class="ag-s">{{ .String "detail" }}</div></div></div>{{ end }}
+                    </div>
+                  </div>
+                {{ end }}
+                </div>
+              </div>
+
+          - type: split-column
+            max-columns: 2
+            widgets:
+              # Home: room temperatures, lights and devices (tap = toggle through a Home Assistant webhook),
+              # appliances with their "running" effect (washer shakes, dryer spins, dishwasher bubbles), low battery.
+              # Entity ids below are examples: rename them to yours. Details per appliance come from
+              # scripts/appliance_stats.py, rooms from scripts/home.py. HA side: homeassistant/dashboard_package.yaml.
+              - type: custom-api
+                title: Home
+                cache: 5s
+                url: ${HA_URL}/api/states
+                headers:
+                  Authorization: Bearer ${HA_TOKEN}
+                subrequests:
+                  home:
+                    url: ${DATA_URL}/home.json
+                  machines:
+                    url: ${DATA_URL}/appliances.json
+                template: |
+                  {{ $wh := "${HA_URL}/api/webhook/${HOME_WEBHOOK_ID}?target=" }}
+                  {{ $dishMin := 225.0 }}{{/* dishwasher programme length in minutes (washing, then drying with almost no power) */}}
+                  {{ $lLiving := false }}{{ $lHall := false }}{{ $lBed := false }}{{ $tv := "" }}
+                  {{ $robotBat := "?" }}{{ $robotState := "" }}{{ $robotProg := "" }}{{ $clean := "" }}
+                  {{ $wash := "" }}{{ $washSince := "" }}{{ $washEnd := 0.0 }}{{ $washDone := 0.0 }}{{ $washLast := "" }}
+                  {{ $dryer := "" }}{{ $drySince := "" }}{{ $dryEnd := 0.0 }}{{ $dryDone := 0.0 }}{{ $dryLeft := 0.0 }}{{ $dryLast := "" }}
+                  {{ $dish := "" }}{{ $dishW := 0.0 }}{{ $dishStart := 0.0 }}{{ $dishLast := "" }}
+                  {{ $minBat := 1000.0 }}{{ $minName := "" }}
+                  {{ range .JSON.Array "" }}{{ $e := .String "entity_id" }}{{ $s := .String "state" }}
+                    {{ if and (eq $e "light.living_room") (eq $s "on") }}{{ $lLiving = true }}{{ end }}
+                    {{ if and (eq $e "light.hallway") (eq $s "on") }}{{ $lHall = true }}{{ end }}
+                    {{ if and (eq $e "switch.bedroom_lamp") (eq $s "on") }}{{ $lBed = true }}{{ end }}
+                    {{ if eq $e "remote.living_room_tv" }}{{ $tv = $s }}{{ end }}
+                    {{ if eq $e "vacuum.robot" }}{{ $robotState = $s }}{{ end }}
+                    {{ if eq $e "sensor.robot_battery" }}{{ $robotBat = $s }}{{ end }}
+                    {{ if eq $e "sensor.robot_cleaning_progress" }}{{ $robotProg = $s }}{{ end }}
+                    {{ if eq $e "sensor.robot_last_cleaning" }}{{ $clean = $s }}{{ end }}
+                    {{ if eq $e "binary_sensor.washer_running" }}{{ $wash = $s }}{{ $washSince = .String "last_changed" }}{{ end }}
+                    {{ if eq $e "input_number.washer_end_ts" }}{{ $washEnd = .Float "state" }}{{ end }}
+                    {{ if eq $e "input_number.washer_emptied_ts" }}{{ $washDone = .Float "state" }}{{ end }}
+                    {{ if eq $e "sensor.washer_last" }}{{ $washLast = $s }}{{ end }}
+                    {{ if eq $e "binary_sensor.dryer_running" }}{{ $dryer = $s }}{{ $drySince = .String "last_changed" }}{{ end }}
+                    {{ if eq $e "input_number.dryer_end_ts" }}{{ $dryEnd = .Float "state" }}{{ end }}
+                    {{ if eq $e "input_number.dryer_emptied_ts" }}{{ $dryDone = .Float "state" }}{{ end }}
+                    {{ if eq $e "sensor.dryer_time_to_end" }}{{ $dryLeft = .Float "state" }}{{ end }}
+                    {{ if eq $e "sensor.dryer_last" }}{{ $dryLast = $s }}{{ end }}
+                    {{ if eq $e "binary_sensor.dishwasher_running" }}{{ $dish = $s }}{{ end }}
+                    {{ if eq $e "sensor.dishwasher_power" }}{{ $dishW = .Float "state" }}{{ end }}
+                    {{ if eq $e "input_number.dishwasher_start_ts" }}{{ $dishStart = .Float "state" }}{{ end }}
+                    {{ if eq $e "sensor.dishwasher_last" }}{{ $dishLast = $s }}{{ end }}
+                    {{ if and (eq (.String "attributes.device_class") "battery") (eq (findMatch "phone|watch|robot" $e) "") (ne $s "unavailable") (ne $s "unknown") }}{{ $v := .Float "state" }}{{ if lt $v $minBat }}{{ $minBat = $v }}{{ $minName = .String "attributes.friendly_name" }}{{ end }}{{ end }}
+                  {{ end }}
+                  {{ $mc := (.Subrequest "machines").JSON }}
+                  {{ $days := -1.0 }}{{ $cleanLbl := "" }}{{ if and (ne $clean "") (ne $clean "unknown") (ne $clean "unavailable") }}{{ $ct := ($clean | parseTime "rfc3339").In now.Location }}{{ $days = div (now.Sub $ct).Hours 24.0 }}{{ $cd := $ct | formatTime "2006-01-02" }}{{ if eq $cd (now | formatTime "2006-01-02") }}{{ $cleanLbl = printf "today at %s" ($ct | formatTime "15:04") }}{{ else if eq $cd (offsetNow "-24h" | formatTime "2006-01-02") }}{{ $cleanLbl = printf "yesterday at %s" ($ct | formatTime "15:04") }}{{ else }}{{ $cleanLbl = printf "%.0f days ago" $days }}{{ end }}{{ end }}
+                  {{ $minName = replaceAll " Battery level" "" $minName }}{{ $minName = replaceAll " battery level" "" $minName }}{{ $minName = replaceAll " Battery" "" $minName }}{{ $minName = replaceAll " battery" "" $minName }}
+                  {{ $robotRun := or (eq $robotState "cleaning") (eq $robotState "mopping") (eq $robotState "returning") }}
+                  {{/* washer: progress against the average cycle length of appliance_stats.py (47 min until there is one) */}}
+                  {{ $wAvg := $mc.Float "washer.moy_min" }}{{ if le $wAvg 0.0 }}{{ $wAvg = 47.0 }}{{ end }}
+                  {{ $washAgo := 0.0 }}{{ if gt $washEnd 0.0 }}{{ $washAgo = (now.Sub (parseTime "unix" (printf "%.0f" $washEnd))).Minutes }}{{ end }}{{ $washWait := and (gt $washEnd 0.0) (lt $washDone $washEnd) (lt $washAgo 720.0) (ne $wash "on") }}
+                  {{ $wEl := -1.0 }}{{ if and (eq $wash "on") (ne $washSince "") }}{{ $wEl = (now.Sub ($washSince | parseTime "rfc3339")).Minutes }}{{ end }}
+                  {{ $wPct := 0.0 }}{{ if ge $wEl 0.0 }}{{ $wPct = mul (div $wEl $wAvg) 100.0 }}{{ if gt $wPct 98.0 }}{{ $wPct = 98.0 }}{{ end }}{{ end }}
+                  {{ $dryAgo := 0.0 }}{{ if gt $dryEnd 0.0 }}{{ $dryAgo = (now.Sub (parseTime "unix" (printf "%.0f" $dryEnd))).Minutes }}{{ end }}{{ $dryWait := and (gt $dryEnd 0.0) (lt $dryDone $dryEnd) (lt $dryAgo 720.0) (ne $dryer "on") }}
+                  {{ $dEl := -1.0 }}{{ if gt $dishStart 0.0 }}{{ $dEl = (now.Sub (parseTime "unix" (printf "%.0f" $dishStart))).Minutes }}{{ end }}
+                  {{ $dishRun := or (eq $dish "on") (and (ge $dEl 0.0) (lt $dEl $dishMin)) }}
+                  {{ $dPct := 0.0 }}{{ $dEnd := "" }}{{ if and $dishRun (ge $dEl 0.0) (lt $dEl (add $dishMin 15.0)) }}{{ $dPct = mul (div $dEl $dishMin) 100.0 }}{{ if gt $dPct 98.0 }}{{ $dPct = 98.0 }}{{ end }}{{ $dEnd = (parseTime "unix" (printf "%.0f" (add $dishStart (mul $dishMin 60.0)))).In now.Location | formatTime "15:04" }}{{ end }}
+                  {{ $pcs := (.Subrequest "home").JSON.Array "pieces" }}{{ if gt (len $pcs) 0 }}<div class="acc-tp">{{ range $pcs }}<div class="acc-tp-c {{ .String "etat" }}"{{ if gt (.Int "teinte") 0 }} style="--h:{{ .Int "teinte" }}"{{ end }}><div class="n">{{ .String "ic" }} {{ .String "nom" }}</div><div class="v">{{ .String "t_txt" }}°</div><div class="s">{{ .String "etat" }}</div>{{ $h := .Int "hum" }}{{ if and (gt $h 0) (lt $h 40) }}<div class="hu">dry {{ $h }} %</div>{{ else if gt $h 60 }}<div class="hu">humid {{ $h }} %</div>{{ end }}{{ if ne (.String "tend") "" }}<div class="tr">{{ .String "tend" }}</div>{{ end }}</div>{{ end }}</div>{{ end }}
+                  <div class="acc-hm-sec">Lights and devices</div>
+                  <div class="acc-hm-tiles">
+                    <form method="post" action="{{ $wh }}living_room" target="ctl-sink"><button type="submit" data-toggle class="acc-hm-t{{ if $lLiving }} on{{ end }}"><span class="acc-hm-ic">💡</span><span class="acc-hm-tx"><span class="acc-hm-n">Living room</span><span class="acc-hm-st">{{ if $lLiving }}on{{ else }}off{{ end }}</span></span></button></form>
+                    <form method="post" action="{{ $wh }}hallway" target="ctl-sink"><button type="submit" data-toggle class="acc-hm-t{{ if $lHall }} on{{ end }}"><span class="acc-hm-ic">💡</span><span class="acc-hm-tx"><span class="acc-hm-n">Hallway</span><span class="acc-hm-st">{{ if $lHall }}on{{ else }}off{{ end }}</span></span></button></form>
+                    <form method="post" action="{{ $wh }}bedroom" target="ctl-sink"><button type="submit" data-toggle class="acc-hm-t{{ if $lBed }} on{{ end }}"><span class="acc-hm-ic">💡</span><span class="acc-hm-tx"><span class="acc-hm-n">Bedroom</span><span class="acc-hm-st">{{ if $lBed }}on{{ else }}off{{ end }}</span></span></button></form>
+                    <form method="post" action="{{ $wh }}tv" target="ctl-sink"><button type="submit" data-toggle class="acc-hm-t{{ if eq $tv "on" }} on{{ end }}"><span class="acc-hm-ic">📺</span><span class="acc-hm-tx"><span class="acc-hm-n">TV</span><span class="acc-hm-st">{{ if eq $tv "on" }}on{{ else }}off{{ end }}</span></span></button></form>
+                    <form method="post" action="{{ $wh }}robot" target="ctl-sink"><button type="submit" class="acc-hm-t{{ if $robotRun }} prog{{ end }}" data-confirm="{{ if $robotRun }}tap again to stop it{{ else }}tap again to start{{ end }}"{{ if and $robotRun (ne $robotProg "") }} style="--p:{{ $robotProg }}%"{{ end }}><span class="acc-hm-ic">🤖</span><span class="acc-hm-tx"><span class="acc-hm-n">Robot</span><span class="acc-hm-st">{{ if or (eq $robotState "cleaning") (eq $robotState "mopping") }}cleaning{{ if ne $robotProg "" }} · {{ $robotProg }} %{{ end }}{{ else if eq $robotState "paused" }}paused{{ else if eq $robotState "returning" }}going home{{ else if eq $robotState "error" }}error{{ else if eq $robotState "unavailable" }}offline{{ else }}{{ $robotBat }} %{{ if ne $cleanLbl "" }} · cleaned {{ $cleanLbl }}{{ end }}{{ end }}</span></span><span class="acc-hm-go">{{ if $robotRun }}Stop{{ else }}Start{{ end }}</span></button></form>
+                  </div>
+                  <div class="acc-hm-lg">
+                    <details class="acc-hm-l{{ if eq $wash "on" }} run{{ else if $washWait }} warn{{ end }} acc-hm-d"><summary><span class="acc-hm-ic">🫧</span><span class="acc-hm-tx"><span class="acc-hm-n">Washer{{ if eq $wash "on" }} · running{{ else if $washWait }} · laundry to hang{{ end }}</span><span class="acc-hm-st">{{ if eq $wash "on" }}{{ if and (ge $wEl 0.0) (lt $wEl (sub $wAvg 2.0)) }}done in ~{{ printf "%.0f" (sub $wAvg $wEl) }} min{{ else }}almost done{{ end }}{{ else if $washWait }}finished {{ if lt $washAgo 60.0 }}{{ printf "%.0f" $washAgo }} min{{ else }}{{ printf "%.0f" (div $washAgo 60.0) }} h{{ end }} ago{{ else }}idle{{ if and (ne $washLast "") (ne $washLast "never") (ne $washLast "unknown") (ne $washLast "unavailable") }} · last wash {{ $washLast }}{{ end }}{{ end }}</span>{{ if gt $wPct 0.0 }}<span class="acc-hm-prog"><i style="width:{{ printf "%.0f" $wPct }}%"></i></span>{{ end }}</span><span class="acc-hm-chev" aria-hidden="true"></span></summary><div class="acc-hm-det">{{ if eq $wash "on" }}{{ if ne $washSince "" }}{{ $t0 := $washSince | parseTime "rfc3339" }}<div><span>Started at</span><b>{{ $t0.In now.Location | formatTime "15:04" }}</b></div><div><span>Done around</span><b>{{ ($t0.Add ((parseTime "unix" (printf "%.0f" (mul $wAvg 60.0))).Sub (parseTime "unix" "0"))).In now.Location | formatTime "15:04" }}</b></div>{{ end }}{{ if ne ($mc.String "washer.moy_cout") "" }}<div><span>Usual cost</span><b>≈ {{ $mc.String "washer.moy_cout" }} ${CURRENCY}</b></div>{{ end }}{{ else if $washWait }}<div><span>Finished at</span><b>{{ (parseTime "unix" (printf "%.0f" $washEnd)).In now.Location | formatTime "15:04" }}</b></div><div><span>To do</span><b>hang the laundry</b></div>{{ end }}{{ if ne ($mc.String "washer.dernier") "" }}<div><span>Last wash</span><b>{{ $mc.String "washer.dernier" }}</b></div>{{ end }}{{ if ne ($mc.String "washer.mois") "" }}<div><span>This month</span><b>{{ $mc.String "washer.mois" }}</b></div>{{ end }}{{ if ne ($mc.String "washer.moyenne") "" }}<div><span>On average</span><b>{{ $mc.String "washer.moyenne" }}</b></div>{{ end }}</div></details>
+                    <details class="acc-hm-l{{ if eq $dryer "on" }} run{{ else if $dryWait }} warn{{ end }} acc-hm-d"><summary><span class="acc-hm-ic">🌀</span><span class="acc-hm-tx"><span class="acc-hm-n">Dryer{{ if eq $dryer "on" }} · running{{ else if $dryWait }} · done{{ end }}</span><span class="acc-hm-st">{{ if eq $dryer "on" }}running{{ if gt $dryLeft 0.0 }} · done in {{ printf "%.0f" $dryLeft }} min{{ end }}{{ else if $dryWait }}laundry to take out{{ else }}idle{{ if and (ne $dryLast "") (ne $dryLast "never") (ne $dryLast "unknown") (ne $dryLast "unavailable") }} · last run {{ $dryLast }}{{ end }}{{ end }}</span></span><span class="acc-hm-chev" aria-hidden="true"></span></summary><div class="acc-hm-det">{{ if eq $dryer "on" }}{{ if ne $drySince "" }}<div><span>Started at</span><b>{{ ($drySince | parseTime "rfc3339").In now.Location | formatTime "15:04" }}</b></div>{{ end }}{{ if gt $dryLeft 0.0 }}<div><span>Done around</span><b>{{ (now.Add ((parseTime "unix" (printf "%.0f" (mul $dryLeft 60.0))).Sub (parseTime "unix" "0"))).In now.Location | formatTime "15:04" }}</b></div>{{ end }}{{ else if $dryWait }}<div><span>To do</span><b>take the laundry out</b></div>{{ end }}{{ if ne ($mc.String "dryer.dernier") "" }}<div><span>Last run</span><b>{{ $mc.String "dryer.dernier" }}</b></div>{{ end }}{{ if ne ($mc.String "dryer.mois") "" }}<div><span>This month</span><b>{{ $mc.String "dryer.mois" }}</b></div>{{ end }}</div></details>
+                    <details class="acc-hm-l{{ if $dishRun }} run {{ if and (eq $dish "on") (gt $dishW 4.0) }}lav{{ else }}sech{{ end }}{{ end }} acc-hm-d"><summary><span class="acc-hm-ic">🍽️</span><span class="acc-hm-tx"><span class="acc-hm-n">Dishwasher{{ if $dishRun }} · {{ if and (eq $dish "on") (gt $dishW 4.0) }}washing{{ else }}drying{{ end }}{{ end }}</span><span class="acc-hm-st">{{ if $dishRun }}{{ if ne $dEnd "" }}done around {{ $dEnd }}{{ else }}{{ printf "%.0f" $dishW }} W{{ end }}{{ else if or (eq $dish "") (eq $dish "unavailable") (eq $dish "unknown") }}smart plug not connected{{ else }}idle{{ if and (ne $dishLast "") (ne $dishLast "never") (ne $dishLast "unknown") (ne $dishLast "unavailable") }} · last run {{ $dishLast }}{{ end }}{{ end }}</span>{{ if gt $dPct 0.0 }}<span class="acc-hm-prog"><i style="width:{{ printf "%.0f" $dPct }}%"></i></span>{{ end }}</span><span class="acc-hm-chev" aria-hidden="true"></span></summary><div class="acc-hm-det">{{ if $dishRun }}<div><span>Phase</span><b>{{ if and (eq $dish "on") (gt $dishW 4.0) }}washing{{ else }}drying{{ end }}</b></div>{{ if gt $dishStart 0.0 }}<div><span>Started at</span><b>{{ (parseTime "unix" (printf "%.0f" $dishStart)).In now.Location | formatTime "15:04" }}</b></div>{{ end }}{{ if ne $dEnd "" }}<div><span>Done around</span><b>{{ $dEnd }}</b></div>{{ end }}{{ if ne ($mc.String "dishwasher.moy_cout") "" }}<div><span>Usual cost</span><b>≈ {{ $mc.String "dishwasher.moy_cout" }} ${CURRENCY}</b></div>{{ end }}{{ end }}{{ if ne ($mc.String "dishwasher.dernier") "" }}<div><span>Last cycle</span><b>{{ $mc.String "dishwasher.dernier" }}</b></div>{{ end }}{{ if ne ($mc.String "dishwasher.mois") "" }}<div><span>This month</span><b>{{ $mc.String "dishwasher.mois" }}</b></div>{{ end }}{{ if ne ($mc.String "dishwasher.moyenne") "" }}<div><span>On average</span><b>{{ $mc.String "dishwasher.moyenne" }}</b></div>{{ end }}</div></details>
+                    {{ if lt $minBat 30.0 }}<div class="acc-hm-l {{ if lt $minBat 20.0 }}bad{{ else }}warn{{ end }}"><span class="acc-hm-ic">🔋</span><span class="acc-hm-tx"><span class="acc-hm-n">Low battery · {{ printf "%.0f" $minBat }} %</span><span class="acc-hm-st">{{ if ne $minName "" }}{{ $minName }}{{ else }}sensor{{ end }} · replace it</span></span></div>{{ end }}
+                  </div>
+                  <iframe name="ctl-sink" style="display:none;"></iframe>
+
+              # Meter readings typed in once a month (scripts/meters.py). The form posts to a Home Assistant webhook;
+              # webhooks.js checks the values before sending and confirms only once HA answered.
+              - type: custom-api
+                title: Meters
+                cache: 1m
+                url: ${DATA_URL}/meters.json
+                template: |
+                  {{ $rl := .JSON.Get "reading" }}
+                  <div class="acc-ct-h"><span class="acc-k">Meters</span><span class="color-subdue size-h6">{{ if ne ($rl.String "date") "" }}read on {{ $rl.String "date" }} · {{ $rl.Int "jours" }} days ago{{ end }}</span></div>
+                  <div class="acc-ct">{{ range .JSON.Array "tiles" }}<div class="acc-ct-t"><div class="l">{{ .String "label" }}</div><div class="v">{{ .String "valeur" }} <small>{{ .String "unit" }}</small><svg viewBox="0 0 60 18"><polyline points="{{ .String "spark" }}" fill="none" stroke-width="2" class="{{ .String "tendance" }}"/></svg></div><div class="d {{ if eq (.String "tendance") "haut" }}acc-up{{ else if eq (.String "tendance") "bas" }}acc-down{{ else }}color-subdue{{ end }}">{{ .String "txt" }}</div></div>{{ end }}</div>
+                  {{ $m := .JSON.Get "meters" }}
+                  <div class="acc-ct-r{{ if $rl.Bool "due" }} warn{{ end }}"><span class="ic">📄</span><span class="t">{{ if $rl.Bool "due" }}Meter reading {{ $rl.String "txt" }}{{ else }}Meters read · {{ $rl.String "txt" }}{{ end }}</span><span class="s">water <span data-meter-index="water">{{ printf "%.0f" ($m.Float "water.index") }}</span> · gas <span data-meter-index="gas">{{ printf "%.0f" ($m.Float "gas.index") }}</span> · electricity <span data-meter-index="elec_day">{{ printf "%.0f" ($m.Float "elec_day.index") }}</span> / <span data-meter-index="elec_night">{{ printf "%.0f" ($m.Float "elec_night.index") }}</span></span></div>
+                  <details style="margin-top:10px;"><summary class="size-h6" style="cursor:pointer;list-style:none;"><span class="color-primary">✎ type the readings ▾</span></summary>
+                    <form id="cpt-form" method="post" action="${HA_URL}/api/webhook/${METERS_WEBHOOK_ID}" target="cpt-sink" class="acc-form">
+                      <label class="size-h6 color-subdue">Water (m³)<input name="water" data-label="Water" type="number" step="0.001" inputmode="decimal" placeholder="{{ printf "%.0f" ($m.Float "water.index") }}"></label>
+                      <label class="size-h6 color-subdue">Gas (m³)<input name="gas" data-label="Gas" type="number" step="0.001" inputmode="decimal" placeholder="{{ printf "%.0f" ($m.Float "gas.index") }}"></label>
+                      <label class="size-h6 color-subdue">Electricity day (kWh)<input name="elec_day" data-label="Electricity day" type="number" step="0.001" inputmode="decimal" placeholder="{{ printf "%.0f" ($m.Float "elec_day.index") }}"></label>
+                      <label class="size-h6 color-subdue">Electricity night (kWh)<input name="elec_night" data-label="Electricity night" type="number" step="0.001" inputmode="decimal" placeholder="{{ printf "%.0f" ($m.Float "elec_night.index") }}"></label>
+                      <button type="submit" style="grid-column:1/3;padding:8px;border-radius:6px;border:0;background:hsl(140,55%,40%);color:#fff;font-weight:600;cursor:pointer;">Save readings</button>
+                      <div id="cpt-msg" class="size-h6 color-subdue" style="grid-column:1/3;">Leave empty what you did not read. A value lower than the current index is refused.</div>
+                    </form>
+                    <iframe name="cpt-sink" style="display:none;"></iframe>
+                  </details>
+
+          # Shortcuts at the bottom, in groups (icons from assets/icons.svg). Replace the URLs with yours.
+          - type: html
+            title: Shortcuts
+            source: |
+              <div class="widget widget-type-custom-api"><div class="widget-header"><h2 class="uppercase">Shortcuts</h2></div><div class="widget-content">
+              <div class="acc-rac">
+                <div class="acc-rac-g">Media</div>
+                <div class="acc-rac-l">
+                  <a class="acc-rac-a" href="https://jellyseerr.example.lan" target="_blank"><i style="--h:265"><svg class="ic"><use href="/assets/icons.svg#search"/></svg></i>Seerr</a>
+                  <a class="acc-rac-a" href="https://jellyfin.example.lan" target="_blank"><i style="--h:210"><svg class="ic"><use href="/assets/icons.svg#play"/></svg></i>Jellyfin</a>
+                  <a class="acc-rac-a" href="https://sonarr.example.lan" target="_blank"><i style="--h:200"><svg class="ic"><use href="/assets/icons.svg#tv"/></svg></i>Sonarr</a>
+                  <a class="acc-rac-a" href="https://radarr.example.lan" target="_blank"><i style="--h:45"><svg class="ic"><use href="/assets/icons.svg#film"/></svg></i>Radarr</a>
+                </div>
+                <div class="acc-rac-g">Home</div>
+                <div class="acc-rac-l">
+                  <a class="acc-rac-a" href="https://homeassistant.example.lan" target="_blank"><i style="--h:195"><svg class="ic"><use href="/assets/icons.svg#house"/></svg></i>Home Assistant</a>
+                  <a class="acc-rac-a" href="https://mealie.example.lan" target="_blank"><i style="--h:140"><svg class="ic"><use href="/assets/icons.svg#utensils"/></svg></i>Mealie</a>
+                  <a class="acc-rac-a" href="https://paperless.example.lan" target="_blank"><i style="--h:160"><svg class="ic"><use href="/assets/icons.svg#file-text"/></svg></i>Paperless</a>
+                </div>
+                <div class="acc-rac-g">Tools</div>
+                <div class="acc-rac-l">
+                  <a class="acc-rac-a" href="https://wiki.example.lan" target="_blank"><i style="--h:225"><svg class="ic"><use href="/assets/icons.svg#book-open"/></svg></i>Wiki</a>
+                  <a class="acc-rac-a" href="https://beszel.example.lan" target="_blank"><i style="--h:170"><svg class="ic"><use href="/assets/icons.svg#activity"/></svg></i>Beszel</a>
+                </div>
+              </div>
+              </div></div>
+
+  - name: Media
+    slug: media
+    # IMDb-app style (assets/media.css). Data: scripts/media.py (*/10), downloads.py (*/2), media_news.py (*/30),
+    # ratings.py (every 6 h). The "+" ribbon on a poster requests the title in Jellyseerr through a Home Assistant webhook.
+    columns:
+      - size: full
+        widgets:
+          # Continue watching: ONE title, the last one played
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 2m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $c := .JSON.Get "ce_soir" }}<div class="mi">
+              <div class="mi-h"><h2>Continue watching</h2>{{ if ne ($c.String "joue") "" }}<span class="mi-hd">watched {{ $c.String "joue" }}</span>{{ end }}</div>
+              {{ if eq ($c.String "titre") "" }}<p class="mi-vide">Nothing in progress. <a class="mi-tout" href="${JELLYFIN_PUBLIC_URL}/web/#/home" target="_blank">Open Jellyfin</a></p>{{ else }}
+              {{ $f := $c.String "fond" }}{{ if eq $f "" }}{{ $f = $c.String "poster" }}{{ end }}
+              <a class="mi-cont" href="{{ $c.String "lien" }}" target="_blank"><span class="mi-cont-img"><img src="{{ $f }}" alt=""><span class="mi-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span><span class="mi-prog"><i style="width:{{ $c.Int "pct" }}%"></i></span></span>
+              <span class="mi-cont-tx">{{ if ne ($c.String "poster") "" }}<img class="mi-cont-aff" src="{{ $c.String "poster" }}" alt="">{{ end }}<span class="mi-cont-m"><b class="mi-cont-t">{{ $c.String "titre" }}</b>{{ if ne ($c.String "ep") "" }}<span class="mi-cont-ep">{{ $c.String "ep" }}</span>{{ end }}
+              <span class="mi-cont-s">{{ if ne ($c.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ $c.String "note" }}</span>{{ end }}{{ if ne ($c.String "annee") "" }}<span>{{ $c.String "annee" }}</span>{{ end }}{{ if ne ($c.String "genres") "" }}<span>{{ $c.String "genres" }}</span>{{ end }}</span>
+              {{ if gt ($c.Int "reste") 0 }}<span class="mi-cont-reste"><b>{{ $c.Int "reste" }} min</b> left{{ if gt ($c.Int "duree") 0 }} of {{ $c.Int "duree" }} min{{ end }}</span>{{ else }}<span class="mi-cont-reste">{{ $c.String "etat" }}</span>{{ end }}</span></span></a>{{ end }}
+              </div>
+
+          # Search box -> Jellyseerr search page, plus genre shortcuts (TMDB genre ids)
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w mi-w-search
+            cache: 1h
+            url: ${DATA_URL}/media.json
+            template: |
+              <div class="mi"><form class="mi-search" action="${SEERR_PUBLIC_URL}/search" method="get" target="_blank" role="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m15.5 15.5 5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg><input type="search" name="query" placeholder="Search series, movies…" enterkeyhint="search" autocomplete="off" aria-label="Search a series or a movie in Jellyseerr"></form>
+              <nav class="mi-chips" aria-label="Jellyseerr shortcuts"><a href="${SEERR_PUBLIC_URL}/discover/movies/genre/10751" target="_blank">Family</a><a href="${SEERR_PUBLIC_URL}/discover/movies/genre/27" target="_blank">Horror</a><a href="${SEERR_PUBLIC_URL}/discover/movies/genre/878" target="_blank">Science fiction</a><a href="${SEERR_PUBLIC_URL}/discover/tv/genre/80" target="_blank">Crime series</a></nav></div>
+
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 5m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $wh := "${HA_URL}/api/webhook/${MEDIA_WEBHOOK_ID}?target=request" }}<div class="mi">
+              <div class="mi-h"><h2>Trending this week</h2><a class="mi-tout" href="${SEERR_PUBLIC_URL}/discover/trending" target="_blank">See all</a></div>
+              <ul class="mi-rangee">{{ range $i, $x := .JSON.Array "tendances" }}{{ if lt $i 10 }}{{ $st := .String "statut" }}<li class="mi-carte"><div class="mi-c-img"><a href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy"></a>{{ if eq $st "library" }}<span class="mi-ok" title="in your library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if eq $st "requested" }}<span class="mi-ruban on" title="already requested"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if gt (.Int "tmdb") 0 }}<form method="post" action="{{ $wh }}" target="mi-sink"><input type="hidden" name="type" value="{{ .String "kind" }}"><input type="hidden" name="id" value="{{ .Int "tmdb" }}"><input type="hidden" name="title" value="{{ .String "titre" }}"><button type="submit" class="mi-ruban" aria-label="Request {{ .String "titre" }}" onclick="if(this.classList.contains('on'))return false;this.classList.add('on','pop');var d=this.closest('.mi-carte').querySelector('.mi-c-dem');if(d)d.hidden=false;"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>{{ end }}</div><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank">{{ if ne (.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ .String "note" }}</span>{{ end }}<span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ if eq (.String "kind") "tv" }}Series{{ else }}Movie{{ end }}{{ if ne (.String "annee") "" }} · {{ .String "annee" }}{{ end }}</span>{{ if eq $st "requested" }}<span class="mi-c-dem">Requested</span>{{ else }}<span class="mi-c-dem" hidden>Requested</span>{{ end }}</a></li>{{ end }}{{ end }}</ul>
+              <iframe name="mi-sink" hidden></iframe></div>
+
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 10m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $wh := "${HA_URL}/api/webhook/${MEDIA_WEBHOOK_ID}?target=request" }}<div class="mi">
+              <div class="mi-h"><h2>Discover</h2></div>
+              <div class="mi-tabs">
+                <input type="radio" name="mi-dc" id="mi-dc1" checked><input type="radio" name="mi-dc" id="mi-dc2"><input type="radio" name="mi-dc" id="mi-dc3">
+                <div class="mi-puces"><label for="mi-dc1">In cinemas soon</label><label for="mi-dc2">Upcoming series</label><label for="mi-dc3">Anime</label></div>
+                <div class="mi-p mi-p1"><ul class="mi-rangee">{{ range $i, $x := .JSON.Array "films_a_venir" }}{{ if lt $i 14 }}{{ $st := .String "statut" }}<li class="mi-carte"><div class="mi-c-img"><a href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy"></a>{{ if eq $st "library" }}<span class="mi-ok" title="in your library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if eq $st "requested" }}<span class="mi-ruban on" title="already requested"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if gt (.Int "tmdb") 0 }}<form method="post" action="{{ $wh }}" target="mi-sink2"><input type="hidden" name="type" value="{{ .String "kind" }}"><input type="hidden" name="id" value="{{ .Int "tmdb" }}"><input type="hidden" name="title" value="{{ .String "titre" }}"><button type="submit" class="mi-ruban" aria-label="Request {{ .String "titre" }}" onclick="if(this.classList.contains('on'))return false;this.classList.add('on','pop');var d=this.closest('.mi-carte').querySelector('.mi-c-dem');if(d)d.hidden=false;"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>{{ end }}</div><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank">{{ if ne (.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ .String "note" }}</span>{{ end }}<span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ .String "date" }}</span>{{ if eq $st "requested" }}<span class="mi-c-dem">Requested</span>{{ else }}<span class="mi-c-dem" hidden>Requested</span>{{ end }}</a></li>{{ end }}{{ end }}</ul></div>
+                <div class="mi-p mi-p2"><ul class="mi-rangee">{{ range $i, $x := .JSON.Array "series_a_venir" }}{{ if lt $i 14 }}{{ $st := .String "statut" }}<li class="mi-carte"><div class="mi-c-img"><a href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy"></a>{{ if eq $st "library" }}<span class="mi-ok" title="in your library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if eq $st "requested" }}<span class="mi-ruban on" title="already requested"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if gt (.Int "tmdb") 0 }}<form method="post" action="{{ $wh }}" target="mi-sink2"><input type="hidden" name="type" value="{{ .String "kind" }}"><input type="hidden" name="id" value="{{ .Int "tmdb" }}"><input type="hidden" name="title" value="{{ .String "titre" }}"><button type="submit" class="mi-ruban" aria-label="Request {{ .String "titre" }}" onclick="if(this.classList.contains('on'))return false;this.classList.add('on','pop');var d=this.closest('.mi-carte').querySelector('.mi-c-dem');if(d)d.hidden=false;"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>{{ end }}</div><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank">{{ if ne (.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ .String "note" }}</span>{{ end }}<span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ .String "date" }}</span>{{ if eq $st "requested" }}<span class="mi-c-dem">Requested</span>{{ else }}<span class="mi-c-dem" hidden>Requested</span>{{ end }}</a></li>{{ end }}{{ end }}</ul></div>
+                <div class="mi-p mi-p3"><ul class="mi-rangee">{{ range $i, $x := .JSON.Array "animes" }}{{ if lt $i 14 }}{{ $st := .String "statut" }}<li class="mi-carte"><div class="mi-c-img"><a href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy"></a>{{ if eq $st "library" }}<span class="mi-ok" title="in your library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if eq $st "requested" }}<span class="mi-ruban on" title="already requested"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{{ else if gt (.Int "tmdb") 0 }}<form method="post" action="{{ $wh }}" target="mi-sink2"><input type="hidden" name="type" value="{{ .String "kind" }}"><input type="hidden" name="id" value="{{ .Int "tmdb" }}"><input type="hidden" name="title" value="{{ .String "titre" }}"><button type="submit" class="mi-ruban" aria-label="Request {{ .String "titre" }}" onclick="if(this.classList.contains('on'))return false;this.classList.add('on','pop');var d=this.closest('.mi-carte').querySelector('.mi-c-dem');if(d)d.hidden=false;"><svg class="rb" viewBox="0 0 28 40" aria-hidden="true"><path d="M0 0h28v40l-14-7L0 40z"/></svg><svg class="ic plus" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><svg class="ic chk" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>{{ end }}</div><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank">{{ if ne (.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ .String "note" }}</span>{{ end }}<span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ .String "date" }}</span>{{ if eq $st "requested" }}<span class="mi-c-dem">Requested</span>{{ else }}<span class="mi-c-dem" hidden>Requested</span>{{ end }}</a></li>{{ end }}{{ end }}</ul></div>
+              </div><iframe name="mi-sink2" hidden></iframe></div>
+
+          # Downloads (scripts/downloads.py): queue + what arrived in the last 2 hours
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 1m
+            url: ${DATA_URL}/downloads.json
+            template: |
+              {{ $it := .JSON.Array "items" }}<div class="mi">
+              <div class="mi-h"><h2>Downloads</h2><span class="mi-hd">{{ .JSON.String "entete" }}</span></div>
+              {{ if eq (len $it) 0 }}<p class="mi-vide">Nothing downloading.</p>{{ else }}
+              {{ range $it }}{{ $e := .String "etat" }}<div class="mi-dl {{ $e }}">{{ if ne (.String "poster") "" }}<img src="{{ .String "poster" }}" alt="">{{ else }}<span class="mi-pg-ph"></span>{{ end }}<div class="mi-dl-tx"><b>{{ .String "titre" }}</b><span><span class="mi-dl-st">{{ if eq $e "bloque" }}blocked{{ else if eq $e "cours" }}downloading{{ else if eq $e "attente" }}waiting{{ else }}done{{ end }}</span>{{ .String "detail" }}</span><span class="mi-barre"><i style="width:{{ .Int "pct" }}%"></i></span>{{ if ne (.String "supprimer") "" }}<form method="post" action="{{ .String "supprimer" }}" target="dl-sink"><button type="submit" class="mi-supp" onclick="if(!confirm('Delete this download and search for another version?'))return false;this.textContent='✓ Deleted, search started';this.disabled=true;this.form.submit();return false;">Delete and search another version</button></form>{{ end }}</div><div class="mi-dl-pct">{{ .String "pct_txt" }}</div></div>{{ end }}
+              <iframe name="dl-sink" hidden></iframe>{{ end }}
+              </div>
+
+          # Your requests: asked in Jellyseerr, not arrived yet, in the order they should arrive
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 5m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $l := .JSON.Array "liste" }}<div class="mi">
+              <div class="mi-h"><h2>Your requests</h2><a class="mi-tout" href="${SEERR_PUBLIC_URL}/requests" target="_blank">See all{{ if gt (len $l) 0 }} ({{ len $l }}){{ end }}</a></div>
+              {{ if eq (len $l) 0 }}<p class="mi-vide">Everything you asked for has arrived. Tap the + of a poster to request a movie or a series.</p>{{ else }}
+              <p class="mi-sous">Not arrived yet, in the order they should arrive.</p>
+              <ul class="mi-rangee">{{ range $l }}<li class="mi-carte"><div class="mi-c-img"><a href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy"></a></div><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank">{{ if ne (.String "note") "" }}<span class="mi-et"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.3l-5.9 3.2 1.3-6.5-4.9-4.6 6.6-.8z"/></svg>{{ .String "note" }}</span>{{ end }}<span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ if eq (.String "kind") "tv" }}Series{{ else }}Movie{{ end }}{{ if ne (.String "annee") "" }} · {{ .String "annee" }}{{ end }}</span><span class="mi-etat {{ .String "cls" }}">{{ .String "etat" }}</span>{{ if eq (.String "cls") "dl" }}<span class="mi-barre"><i style="width:{{ .Int "pct" }}%"></i></span>{{ end }}</a></li>{{ end }}</ul>{{ end }}
+              </div>
+
+          # This week (Sonarr episodes + Radarr digital releases), then "Later"
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 5m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $sem := .JSON.Array "semaine" }}<div class="mi">
+              <div class="mi-h"><h2>This week</h2></div>
+              {{ if eq (len $sem) 0 }}<p class="mi-vide">No episode of your series and no movie expected this week.</p>{{ else }}
+              <ul class="mi-pg">{{ range $sem }}<li class="mi-pg-j{{ if eq (.String "jour") "Today" }} auj{{ end }}"><div class="mi-pg-d">{{ .String "jour" }}</div><ul>{{ range .Array "items" }}<li class="mi-pg-it">{{ if ne (.String "poster") "" }}<img src="{{ .String "poster" }}" alt="" loading="lazy">{{ else }}<span class="mi-pg-ph"></span>{{ end }}<span class="mi-pg-tx"><b>{{ .String "titre" }}</b><span class="mi-pg-ep">{{ .String "ep" }}</span>{{ if .Bool "film" }}<span class="mi-tag">movie</span>{{ end }}{{ if .Bool "dispo" }}<span class="mi-okt">✓ in your library</span>{{ end }}</span></li>{{ end }}</ul></li>{{ end }}</ul>{{ end }}
+              {{ $pt := .JSON.Array "plus_tard" }}{{ if gt (len $pt) 0 }}<details class="mi-plus"><summary>Later <span>{{ len $pt }}</span></summary><ul class="mi-tard">{{ range $pt }}<li>{{ if ne (.String "poster") "" }}<img src="{{ .String "poster" }}" alt="" loading="lazy">{{ else }}<span class="mi-pg-ph"></span>{{ end }}<div><b>{{ .String "titre" }}</b><span>{{ .String "ep" }}</span></div><em>{{ .String "quand" }}</em></li>{{ end }}</ul></details>{{ end }}
+              </div>
+
+          # New in the library (last 10 days)
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 5m
+            url: ${DATA_URL}/media.json
+            template: |
+              {{ $n := .JSON.Array "nouveautes" }}<div class="mi">
+              <div class="mi-h"><h2>New in the library</h2><a class="mi-tout" href="${JELLYFIN_PUBLIC_URL}/web/#/home" target="_blank">See all</a></div>
+              {{ if eq (len $n) 0 }}<p class="mi-vide">Nothing new in the last 10 days.</p>{{ else }}
+              <ul class="mi-rangee">{{ range $n }}<li class="mi-carte"><a class="mi-c-img" href="{{ .String "lien" }}" target="_blank"><img src="{{ .String "poster" }}" alt="" loading="lazy">{{ if .Bool "vu" }}<span class="mi-badge vu">✓ watched</span>{{ else }}<span class="mi-badge">{{ .String "badge" }}</span>{{ end }}</a><a class="mi-c-tx" href="{{ .String "lien" }}" target="_blank"><span class="mi-c-t">{{ .String "titre" }}</span><span class="mi-c-s">{{ if ne (.String "sous") "" }}{{ .String "sous" }} · {{ end }}{{ .String "quand" }}</span></a></li>{{ end }}</ul>{{ end }}
+              </div>
+
+          # Series news (scripts/media_news.py): "Your series" first when a news item mentions one of them
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 15m
+            url: ${DATA_URL}/media-news.json
+            template: |
+              {{ $a := .JSON.Get "actus" }}{{ $l := $a.Array "items" }}{{ $u := $a.Array "une" }}{{ $ts := $a.Bool "tes_series" }}<div class="mi">
+              <div class="mi-h"><h2>Series news</h2></div>
+              {{ if eq (len $u) 0 }}<p class="mi-vide">No news for now.</p>{{ else }}
+              <div class="mi-tabs">{{ if $ts }}<input type="radio" name="mi-nw" id="mi-nw1" checked><input type="radio" name="mi-nw" id="mi-nw2">{{ else }}<input type="radio" name="mi-nw" id="mi-nw2" checked>{{ end }}
+              <div class="mi-onglets">{{ if $ts }}<label for="mi-nw1">Your series</label>{{ end }}<label for="mi-nw2">Top stories</label></div>
+              {{ if $ts }}<div class="mi-p mi-nw1"><ul class="mi-news">{{ range $l }}<li><a href="{{ .String "lien" }}" target="_blank"><div class="mi-nw-tx"><b>{{ .String "titre" }}</b>{{ if ne (.String "resume") "" }}<p>{{ .String "resume" }}</p>{{ end }}<span>{{ .String "quand" }} | {{ .String "source" }}</span></div>{{ if ne (.String "img") "" }}<img src="{{ .String "img" }}" alt="" loading="lazy">{{ end }}</a></li>{{ end }}</ul></div>{{ end }}
+              <div class="mi-p mi-nw2"><ul class="mi-news">{{ range $u }}<li><a href="{{ .String "lien" }}" target="_blank"><div class="mi-nw-tx"><b>{{ .String "titre" }}</b>{{ if ne (.String "resume") "" }}<p>{{ .String "resume" }}</p>{{ end }}<span>{{ .String "quand" }} | {{ .String "source" }}</span></div>{{ if ne (.String "img") "" }}<img src="{{ .String "img" }}" alt="" loading="lazy">{{ end }}</a></li>{{ end }}</ul></div></div>{{ end }}
+              </div>
+
+          - type: custom-api
+            hide-header: true
+            css-class: mi-w
+            cache: 1h
+            url: ${DATA_URL}/media.json
+            template: |
+              <div class="mi mi-fin"><nav class="mi-liens"><a href="${JELLYFIN_PUBLIC_URL}/" target="_blank">Jellyfin</a><a href="${SEERR_PUBLIC_URL}/" target="_blank">Jellyseerr</a><a href="https://www.justwatch.com/" target="_blank">JustWatch</a><a href="https://www.imdb.com/" target="_blank">IMDb</a></nav></div>

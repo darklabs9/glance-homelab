@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Groceries</title>
+<meta name="theme-color" content="#2f7d4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f1ea;--card:#fff;--text:#1f2a22;--muted:#6b7a70;--line:#e4dfd3;--green:#2f7d4f;--green2:#e3f2e8;--amber:#b7791f;--amber2:#fbeed5;--red:#b3412f;--shadow:0 1px 3px rgba(0,0,0,.07)}
+@media(prefers-color-scheme:dark){:root{--bg:#161a17;--card:#21271f;--text:#eef2ea;--muted:#97a39a;--line:#2d3530;--green:#5fbf85;--green2:#1f3a2a;--amber:#e0a74a;--amber2:#3b2e14;--red:#e07a68;--shadow:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:17px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px}
+.titlebar{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:26px;letter-spacing:-.3px}
+.count{font-size:15px;color:var(--muted)}
+.count b{color:var(--text);font-size:20px}
+.progress{height:6px;border-radius:999px;background:var(--line);margin-top:8px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--green);border-radius:999px;transition:width .3s}
+.statusbar{margin-top:6px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-height:20px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+.dot.off{background:var(--amber)}.dot.err{background:var(--red)}
+.pending{background:var(--amber2);color:var(--amber);padding:1px 8px;border-radius:999px;font-weight:600}
+button.link{background:none;border:0;color:var(--green);font:inherit;font-size:13px;padding:0;text-decoration:underline}
+#refresh{margin-left:auto}
+main{padding:0 12px 120px}
+section.aisle{--c:#9aa5a0;margin:12px 0;border-radius:18px;background:var(--card);box-shadow:var(--shadow);overflow:hidden;border:1px solid color-mix(in srgb,var(--c) 35%,var(--line))}
+section.aisle h2{margin:0;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;letter-spacing:.01em;color:color-mix(in srgb,var(--c) 70%,var(--text));background:color-mix(in srgb,var(--c) 18%,var(--card))}
+@media(prefers-color-scheme:dark){section.aisle h2{color:color-mix(in srgb,var(--c) 75%,white);background:color-mix(in srgb,var(--c) 22%,var(--card))}}
+section.aisle h2 .ico{width:30px;height:30px;border-radius:10px;background:var(--c);display:grid;place-items:center;font-size:17px;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+h2 .n{margin-left:auto;font-weight:600;font-size:13px;background:color-mix(in srgb,var(--c) 28%,var(--card));padding:2px 9px;border-radius:999px}
+h2.simple{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 6px 6px;display:flex;align-items:center;gap:8px}
+h2.simple .n{background:none;padding:0;font-size:13px}
+ul{list-style:none;margin:0;padding:0;background:var(--card);border-radius:16px;overflow:hidden}
+#done ul{box-shadow:var(--shadow)}
+section.aisle ul{border-radius:0}
+li{--c:#9aa5a0;display:flex;align-items:center;gap:14px;padding:13px 14px 13px 12px;border-top:1px solid var(--line);cursor:pointer;user-select:none;transition:background .15s;border-left:4px solid var(--c)}
+li:first-child{border-top:0}
+li:active{background:color-mix(in srgb,var(--c) 12%,var(--card))}
+.tick{width:28px;height:28px;border-radius:50%;border:2px solid color-mix(in srgb,var(--c) 60%,#b5bdb6);flex:none;display:grid;place-items:center;transition:all .15s}
+.tick svg{width:16px;height:16px;opacity:0;transform:scale(.5);transition:all .15s}
+li.ok .tick{background:var(--c);border-color:var(--c)}
+li.ok .tick svg{opacity:1;transform:scale(1)}
+.txt{flex:1;min-width:0}
+.name{font-weight:600}
+.name .q{color:var(--muted);font-weight:500;margin-left:6px;font-size:15px}
+.det{font-size:13px;color:var(--muted);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+li.ok .name{text-decoration:line-through;color:var(--muted);font-weight:500}
+li.ok .det{display:none}
+li.tmp .name::after{content:" · pending";color:var(--amber);font-size:12px;font-weight:500}
+.empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:16px}
+.empty big{display:block;font-size:48px;margin-bottom:8px}
+#done summary{list-style:none;cursor:pointer}
+#done li{border-left-color:var(--c)}
+#done summary::-webkit-details-marker{display:none}
+#done h2.simple::before{content:"▸";font-size:14px;transition:transform .15s}
+#done[open] h2.simple::before{transform:rotate(90deg)}
+#done ul li{opacity:.75}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line);z-index:6}
+.entry{display:flex;gap:8px;background:var(--card);border-radius:14px;padding:6px 6px 6px 14px;box-shadow:var(--shadow);align-items:center}
+.entry input{flex:1;border:0;background:none;font:inherit;color:var(--text);outline:0;min-width:0}
+.entry button{background:var(--green);color:#fff;border:0;border-radius:10px;width:42px;height:38px;font-size:24px;line-height:1;font-weight:600}
+.entry button:disabled{opacity:.35}
+#sugg{display:flex;gap:6px;overflow-x:auto;padding:0 2px 8px;scrollbar-width:none}
+#sugg::-webkit-scrollbar{display:none}
+#sugg button{flex:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:14px;color:var(--text)}
+#sugg button small{color:var(--muted);margin-left:4px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;white-space:nowrap}
+.toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar"><h1 id="title">Groceries</h1><div class="count" id="count"></div></div>
+  <div class="progress"><i id="progress" style="width:0"></i></div>
+  <div class="statusbar"><span class="dot" id="dot"></span><span id="status">Loading…</span><span class="pending" id="pending" hidden></span><button class="link" id="notif-on" hidden>Enable notifications</button><button class="link" id="refresh">Refresh</button></div>
+</header>
+<main>
+  <div id="list"></div>
+  <details id="done"></details>
+</main>
+<div class="bar">
+  <div id="sugg"></div>
+  <form class="entry" id="form" autocomplete="off"><input id="text" placeholder="Add an item…" enterkeyhint="done" aria-label="Add an item"><button type="submit" id="plus" disabled aria-label="Add">+</button></form>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const BASE = new URL('./', location.href).pathname, DATA = 'grocery-data', K_LIST = BASE + '_list', K_OPS = BASE + '_ops', K_CAT = BASE + '_catalog';
+const $ = s => document.querySelector(s);
+let list = null, ops = [], catalog = [], online = navigator.onLine, syncing = false, lastError = null;
+
+async function read(k){ try{ const c = await caches.open(DATA); const r = await c.match(k); return r ? r.json() : null; }catch(_){ return null; } }
+async function write(k, v){ try{ const c = await caches.open(DATA); await c.put(k, new Response(JSON.stringify(v), {headers:{'Content-Type':'application/json'}})); }catch(_){} }
+
+function fmtTime(ts){ const d = new Date(ts*1000), n = new Date(); const h = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); return d.toDateString()===n.toDateString() ? h : d.toLocaleDateString([], {weekday:'short',day:'numeric'}) + ' ' + h; }
+// fetch with a timeout: in airplane mode with a VPN app, Android sometimes claims to be "online" and the request hangs forever
+async function fetchT(url, opts = {}, ms = 8000){ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); try { return await fetch(url, {...opts, signal: c.signal}); } finally { clearTimeout(t); } }
+let retryTimer = null;
+function retryLater(){ clearTimeout(retryTimer); retryTimer = setTimeout(() => { if(document.visibilityState === 'visible') sync(); }, 20000); }
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('on'), 2200); }
+
+// --- rendering ---
+function view(){
+  if(!list) return {todo:[], done:[]};
+  const items = list.items.map(i => ({...i}));
+  // operations not sent yet are applied on top of the server's list
+  for(const op of ops){
+    if(op.type==='check'){ const it = items.find(i=>i.id===op.id); if(it) it.checked = op.checked; }
+    else if(op.type==='add' && !items.some(i=>i.name.toLowerCase()===op.text.toLowerCase())) items.push({id:'tmp-'+op.t, name:op.text, detail:'', checked:false, aisle:'New', aislePos:998, tmp:true});
+  }
+  return {todo: items.filter(i=>!i.checked), done: items.filter(i=>i.checked)};
+}
+const tick = '<span class="tick"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span>';
+function row(i){ const q = i.qty ? `<span class="q">× ${esc(i.qty)}${i.unit ? ' ' + esc(i.unit) : ''}</span>` : ''; return `<li data-id="${esc(i.id)}" class="${i.checked?'ok':''}${i.tmp?' tmp':''}" style="--c:${color(i.color)}">${tick}<div class="txt"><div class="name">${esc(i.name)}${q}</div>${i.detail?`<div class="det">${esc(i.detail)}</div>`:''}</div></li>`; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function color(c){ return /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#9aa5a0'; }
+function render(){
+  const {todo, done} = view();
+  if(list && list.name) { $('#title').textContent = list.name; document.title = list.name; }
+  $('#count').innerHTML = list ? `<b>${todo.length}</b> to get` + (done.length ? ` <span style="opacity:.7">· ${done.length} done</span>` : '') : '';
+  const groups = new Map();
+  for(const i of todo){ if(!groups.has(i.aisle)) groups.set(i.aisle, []); groups.get(i.aisle).push(i); }
+  const icons = (list && list.icons) || {};
+  let h = '';
+  if(!list) h = '<div class="empty"><big>🛒</big>Open the app once with network<br>to fetch the list.</div>';
+  else if(!todo.length) h = '<div class="empty"><big>🎉</big>Everything is in the cart!</div>';
+  for(const [aisle, its] of groups) h += `<section class="aisle" style="--c:${color(its[0].color)}"><h2><span class="ico">${esc(icons[aisle]||'🛒')}</span>${esc(aisle)}<span class="n">${its.length}</span></h2><ul>${its.map(row).join('')}</ul></section>`;
+  const total = todo.length + done.length; $('#progress').style.width = total ? Math.round(100*done.length/total) + '%' : '0';
+  $('#list').innerHTML = h;
+  const f = $('#done');
+  f.hidden = !done.length;
+  f.innerHTML = done.length ? `<summary><h2 class="simple">In the cart<span class="n">${done.length}</span></h2></summary><ul>${done.map(row).join('')}</ul>` : '';
+  renderStatus();
+}
+function renderStatus(){
+  const p = $('#dot'), e = $('#status'), a = $('#pending');
+  p.className = 'dot ' + ((!online || lastError) ? 'off' : '');
+  const when = list ? fmtTime(list.at) : '?';
+  e.textContent = syncing ? 'Syncing…' : !online ? 'Offline · list from ' + when : lastError ? 'No network · list from ' + when : (list ? 'Up to date · ' + when : 'Online');
+  a.hidden = !ops.length; a.textContent = ops.length + ' to send';
+}
+
+// --- actions ---
+let syncTimer = null;
+async function toggle(id){
+  if(!list) return;
+  const tmp = id.startsWith('tmp-');
+  if(tmp){ ops = ops.filter(o => !(o.type==='add' && 'tmp-'+o.t===id)); await write(K_OPS, ops); render(); return; }
+  const it = list.items.find(i=>i.id===id); if(!it) return;
+  const {done} = view();
+  const current = done.some(i=>i.id===id);
+  ops = ops.filter(o => !(o.type==='check' && o.id===id));
+  if(current === it.checked) ops.push({type:'check', id, checked:!current, t:Date.now()});   // otherwise we are back to the server state: nothing to send
+  if(navigator.vibrate) navigator.vibrate(8);
+  await write(K_OPS, ops); render();
+  clearTimeout(syncTimer); syncTimer = setTimeout(sync, 500);
+}
+async function add(text){
+  text = text.trim(); if(!text) return;
+  ops.push({type:'add', text, t:Date.now()});
+  await write(K_OPS, ops); render();
+  $('#text').value = ''; $('#plus').disabled = true; suggestions('');
+  clearTimeout(syncTimer); syncTimer = setTimeout(sync, 300);
+}
+async function sync(){
+  if(syncing || !navigator.onLine){ if(!navigator.onLine) await askBackgroundSync(); return; }
+  syncing = true; renderStatus();
+  const sent = ops.slice();
+  try{
+    let d;
+    if(sent.length){
+      const r = await fetchT(BASE + 'api/ops', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ops:sent})}, 12000);
+      if(!r.ok) throw new Error(r.status);
+      d = await r.json();
+      ops = ops.slice(sent.length);
+      const msgs = d.results.filter(x=>x.message && !/^added/.test(x.message)).map(x=>x.message);
+      if(msgs.length) toast(msgs[0]);
+      list = d.list;
+    } else {
+      const r = await fetchT(BASE + 'api/list'); if(!r.ok) throw new Error(r.status);
+      list = await r.json();
+    }
+    lastError = null; clearTimeout(retryTimer);
+    await write(K_LIST, list); await write(K_OPS, ops);
+  }catch(e){
+    lastError = String(e); await askBackgroundSync(); retryLater();
+  }
+  syncing = false; render();
+}
+async function askBackgroundSync(){ try{ const reg = await navigator.serviceWorker.ready; if('sync' in reg) await reg.sync.register('grocery-ops'); }catch(_){} }
+
+// --- item suggestions (optional catalog, kept in cache) ---
+function norm(s){ return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function suggestions(q){
+  const box = $('#sugg'); q = norm(q.trim());
+  if(!q || q.length < 2 || !catalog.length){ box.innerHTML = ''; return; }
+  const onList = new Set((list ? list.items.filter(i=>!i.checked).map(i=>norm(i.name)) : []));
+  const found = catalog.filter(a => norm(a.name).includes(q) || norm(a.keywords||'').includes(q)).filter(a=>!onList.has(norm(a.name))).slice(0, 8);
+  box.innerHTML = found.map(a => `<button type="button" data-name="${esc(a.name)}">${esc(a.name)}<small>${esc(a.aisle||'')}</small></button>`).join('');
+}
+async function loadCatalog(){
+  catalog = (await read(K_CAT)) || [];
+  if(navigator.onLine){ try{ const r = await fetchT(BASE + 'api/catalog'); if(r.ok){ const d = await r.json(); catalog = d.items; await write(K_CAT, catalog); } }catch(_){} }
+}
+
+// --- push notifications (the server says when the list changed) ---
+function b64(s){ const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b, c=>c.charCodeAt(0)); }
+async function pushState(){
+  if(!('PushManager' in window) || !('Notification' in window)) return 'unavailable';
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if(sub){ if(navigator.onLine) sendSubscription(sub); return 'ok'; }
+  return Notification.permission === 'denied' ? 'denied' : 'to-enable';
+}
+async function sendSubscription(sub){ try{ await fetchT(BASE + 'api/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...sub.toJSON(), device:navigator.userAgent.slice(0,80)})}); }catch(_){} }
+async function enablePush(){
+  try{
+    const perm = await Notification.requestPermission(); if(perm !== 'granted'){ toast('Notifications refused'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const r = await fetchT(BASE + 'api/vapid'); const {key} = await r.json();
+    const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64(key)});
+    await sendSubscription(sub);
+    try{ if('periodicSync' in reg) await reg.periodicSync.register('grocery-refresh', {minInterval: 6*3600*1000}); }catch(_){}
+    $('#notif-on').hidden = true; toast('The list will now update by itself');
+  }catch(e){ toast('Could not enable: ' + e.message); }
+}
+
+// --- start ---
+document.addEventListener('click', e => {
+  const li = e.target.closest('li[data-id]'); if(li) return toggle(li.dataset.id);
+  const s = e.target.closest('#sugg button'); if(s) return add(s.dataset.name);
+});
+$('#form').addEventListener('submit', e => { e.preventDefault(); add($('#text').value); });
+$('#text').addEventListener('input', e => { $('#plus').disabled = !e.target.value.trim(); suggestions(e.target.value); });
+$('#refresh').addEventListener('click', () => { lastError = null; sync(); });
+$('#notif-on').addEventListener('click', enablePush);
+window.addEventListener('online', () => { online = true; lastError = null; sync(); });
+window.addEventListener('offline', () => { online = false; renderStatus(); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && navigator.onLine) sync(); });
+
+(async () => {
+  list = await read(K_LIST); ops = (await read(K_OPS)) || []; render();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register(BASE + 'sw.js', {scope: BASE});
+    navigator.serviceWorker.addEventListener('message', async e => {
+      if(e.data && e.data.type === 'list'){ list = e.data.list; ops = (await read(K_OPS)) || []; lastError = null; render(); }
+    });
+    pushState().then(s => { if(s === 'to-enable') $('#notif-on').hidden = false; });
+  }
+  loadCatalog();
+  sync();
+})();
+</script>
+</body>
+</html>
