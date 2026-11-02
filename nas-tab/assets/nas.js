@@ -86,10 +86,10 @@ function init(root) {
     var t = $("nas-tiles"); t.innerHTML = "";
     function tile(v, l, warn) { var x = el("div", "t" + (warn ? " attention" : "")); x.appendChild(el("div", "v", v)); x.appendChild(el("div", "l", l)); t.appendChild(x); }
     var c = s.containers || {};
-    tile((c.running || 0) + "/" + (c.total || 0), "Containers", c.running < c.total);
+    tile((c.running || 0) + "/" + (c.total || 0), c.label || "Containers", c.running < c.total);
     if (s.cpu_temp != null) tile(s.cpu_temp + "°", "CPU", s.cpu_temp >= 80);
     if (s.ram) tile(s.ram.used + "/" + s.ram.total, "Memory GB", s.ram.used / s.ram.total > 0.9);
-    if (s.disk) tile(s.disk.used + "/" + s.disk.total, "Disk TB", s.disk.pct >= 85);
+    if (s.disk) tile(s.disk.used + "/" + s.disk.total, s.disk.label || "Disk TB", s.disk.pct >= 85);
     var raid = s.raid || [];
     if (raid.length) {
       var bad = raid.filter(function (r) { return r.status.indexOf("_") >= 0; });
@@ -223,10 +223,12 @@ function init(root) {
     $("nas-s-group").textContent = dep ? "attached to " + s.name : ((g ? g.title : "") + (s.desc ? " · " + s.desc : ""));
     $("nas-s-dot").className = "dot " + dotOf(f);
     var ff = $("nas-s-facts"); ff.innerHTML = "";
-    ff.appendChild(fact("Image", f.image)); ff.appendChild(fact("Version", f.version)); ff.appendChild(fact("Address", f.ip)); ff.appendChild(fact("Up for", f.up));
-    ff.appendChild(fact("CPU", f.cpu)); ff.appendChild(fact("Memory", f.ram));
+    // f.facts ([label, value, wide]) replaces the Docker facts, for collectors that are not about containers (lab-tab)
+    if (f.facts) f.facts.forEach(function (p) { ff.appendChild(fact(p[0], p[1], p[2])); });
+    else { ff.appendChild(fact("Image", f.image)); ff.appendChild(fact("Version", f.version)); ff.appendChild(fact("Address", f.ip)); ff.appendChild(fact("Up for", f.up));
+    ff.appendChild(fact("CPU", f.cpu)); ff.appendChild(fact("Memory", f.ram)); }
     ff.appendChild(fact("Health", f.state !== "running" ? "stopped (" + f.state + ")" : f.health === "unhealthy" ? "unhealthy" : f.health === "starting" ? "starting…" : (f.health === "healthy" ? "healthy" : "running") + (f.update_available ? " · update available" : "")));
-    ff.appendChild(fact("Last update", f.updated || "—"));
+    if (!f.facts) ff.appendChild(fact("Last update", f.updated || "—"));
     if (!dep && safeUrl(s.url)) ff.appendChild(fact("Web address", s.url.replace(/^https?:\/\//, ""), true));
     if (!dep && s.deps && s.deps.length) ff.appendChild(fact("Attached", s.deps.join(", "), true));
     var w = $("nas-s-warn");
@@ -274,6 +276,7 @@ function init(root) {
       b.appendChild(r);
     });
     var up = $("nas-upd"); up.innerHTML = "";
+    up.closest("section").hidden = !d.updates;   // no update source in the JSON: hide the block
     ((d.updates || {}).recent || []).forEach(function (m) { up.appendChild(row("", m.c, (m.from || "?") + " → " + (m.to || "?"), m.when)); });
     if (!up.firstChild) up.appendChild(el("div", "empty", "No update in the last two weeks"));
     var mr = Array.prototype.slice.call(up.children).filter(function (x) { return x.classList.contains("row"); }).slice(3);
@@ -411,6 +414,7 @@ function init(root) {
   }
   function renderTasks(d) {
     var cr = $("nas-tasks"), ta = d.tasks || [], now = new Date(d.generated || Date.now());
+    cr.closest("section").hidden = !d.tasks;     // no task source in the JSON: hide the block
     cr.innerHTML = ""; $("nas-tasks-n").textContent = ta.length;
     if (!ta.length) { cr.appendChild(el("div", "empty", "No cron files found")); return; }
     var P = ta.filter(function (x) { return x.freq !== "continuous"; }).sort(function (a, b) { return (a.next || "9") < (b.next || "9") ? -1 : 1; });

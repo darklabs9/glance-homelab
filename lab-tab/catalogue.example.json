@@ -1,0 +1,20 @@
+{
+  "groups": [
+    {"id": "entry", "title": "Front door", "entry": true},
+    {"id": "apps", "title": "Apps"},
+    {"id": "monitoring", "title": "Monitoring"}
+  ],
+  "containers": [
+    {"container": "proxy", "name": "Reverse proxy", "group": "entry", "desc": "HTTPS for every *.example.lan",
+     "health": "https://proxy.example.lan", "vmid": 101, "where": "CT 101 proxy · node1", "ip": "192.168.1.20",
+     "tier": "critical", "sensitive": "access to every web app"},
+    {"container": "sso", "name": "SSO", "group": "entry", "desc": "Single sign-on", "url": "https://id.example.lan",
+     "health": "https://id.example.lan/healthz", "vmid": 102, "where": "CT 102 sso · node1", "ip": "192.168.1.21",
+     "tier": "critical", "sensitive": "logins to every app"},
+    {"container": "wiki", "name": "Wiki", "group": "apps", "desc": "Notes", "url": "https://wiki.example.lan",
+     "health": "http://192.168.1.30:3000", "vmid": 110, "where": "CT 110 wiki · node2", "ip": "192.168.1.30",
+     "tier": "standard", "facts": [["Backup", "nightly"]]},
+    {"container": "uptime-kuma", "name": "Uptime Kuma", "group": "monitoring", "desc": "Uptime checks",
+     "url": "https://uptime.example.lan", "where": "NAS", "ip": "192.168.1.5", "tier": "important"}
+  ]
+}

@@ -1,0 +1,92 @@
+# Side column for the Lab page: four custom-api widgets over a pulse-kiosk style /api/summary
+# (the same URL lab-state.py reads). Include it in a column's widget list:
+#
+#   - size: small
+#     widgets:
+#       - $include: pulse-widgets.yml
+#
+# Glance fetches the summary server-side, so the browser never needs to reach Pulse.
+# Bars use Glance's own .progress-bar / .progress-value classes, so the theme colours apply.
+
+- type: custom-api
+  title: Nodes
+  cache: 1m
+  url: ${PULSE_SUMMARY_URL}
+  template: |
+    {{ range .JSON.Array "nodes" }}
+    <div class="margin-bottom-15">
+      <div class="flex justify-between items-center">
+        <span class="size-h4 color-highlight">{{ .String "name" }}</span>
+        <span class="size-h6 {{ if eq (.String "status") "online" }}color-positive{{ else }}color-negative{{ end }}">{{ .String "status" }}</span>
+      </div>
+      <div class="size-h6 color-subdue">PVE {{ .String "pveVersion" }} · {{ printf "%.0f" (.Float "temp") }}° · load {{ printf "%.1f" (.Float "load.0") }} · up {{ printf "%.0f" (div (.Float "uptime") 86400) }} d</div>
+      <div class="flex justify-between size-h6 margin-top-7"><span>CPU · {{ .Int "cpus" }} threads</span><span>{{ printf "%.0f" (.Float "cpu") }} %</span></div>
+      <div class="progress-bar"><div class="progress-value{{ if ge (.Float "cpu") 85.0 }} progress-value-notice{{ end }}" style="--percent: {{ printf "%.0f" (.Float "cpu") }}"></div></div>
+      <div class="flex justify-between size-h6 margin-top-7"><span>Memory</span><span>{{ printf "%.0f" (div (.Float "memUsed") 1e9) }} / {{ printf "%.0f" (div (.Float "memTotal") 1e9) }} GB</span></div>
+      <div class="progress-bar"><div class="progress-value{{ if ge (.Float "mem") 85.0 }} progress-value-notice{{ end }}" style="--percent: {{ printf "%.0f" (.Float "mem") }}"></div></div>
+      <div class="size-h6 color-subdue margin-top-5">{{ .Int "guestsRunning" }} / {{ .Int "guestsTotal" }} guests running</div>
+    </div>
+    {{ end }}
+    <ul class="list list-gap-8 size-h6">
+      {{ range .JSON.Array "hosts" }}
+      <li class="flex justify-between gap-10">
+        <span class="text-truncate">{{ .String "name" }} <span class="color-subdue">{{ .String "kind" }}</span></span>
+        <span class="shrink-0 {{ if eq (.String "status") "online" }}color-positive{{ else }}color-negative{{ end }}">{{ .String "status" }}{{ if .Exists "containers.total" }} · {{ .Int "containers.running" }}/{{ .Int "containers.total" }}{{ end }}</span>
+      </li>
+      {{ end }}
+    </ul>
+
+- type: custom-api
+  title: Storage
+  cache: 1m
+  url: ${PULSE_SUMMARY_URL}
+  template: |
+    {{ range sortByFloat "used" "desc" (.JSON.Array "storage") }}
+    <div class="margin-bottom-10">
+      <div class="flex justify-between size-h6 gap-10">
+        <span class="text-truncate color-highlight">{{ .String "name" }}{{ if .String "host" }} <span class="color-subdue">{{ .String "host" }}</span>{{ end }}</span>
+        <span class="shrink-0">{{ printf "%.1f" (div (.Float "usedBytes") 1e12) }} / {{ printf "%.1f" (div (.Float "totalBytes") 1e12) }} TB</span>
+      </div>
+      <div class="progress-bar"><div class="progress-value{{ if ge (.Float "used") 85.0 }} progress-value-notice{{ end }}" style="--percent: {{ printf "%.0f" (.Float "used") }}"></div></div>
+    </div>
+    {{ end }}
+
+- type: custom-api
+  title: Uptime Kuma
+  cache: 1m
+  url: ${PULSE_SUMMARY_URL}
+  template: |
+    {{ if .JSON.Bool "kuma.ok" }}
+    <div class="flex justify-between text-center">
+      <div><div class="size-h2 color-positive">{{ .JSON.Int "kuma.up" }}</div><div class="size-h6">up</div></div>
+      <div><div class="size-h2 {{ if gt (.JSON.Int "kuma.down") 0 }}color-negative{{ end }}">{{ .JSON.Int "kuma.down" }}</div><div class="size-h6">down</div></div>
+      <div><div class="size-h2">{{ .JSON.Int "kuma.pending" }}</div><div class="size-h6">pending</div></div>
+      <div><div class="size-h2">{{ .JSON.Int "kuma.maintenance" }}</div><div class="size-h6">maint.</div></div>
+    </div>
+    <ul class="list list-gap-8 margin-top-15 size-h6">
+      {{ range .JSON.Array "kuma.monitors" }}{{ if ne (.String "status") "up" }}
+      <li class="flex justify-between gap-10">
+        <span class="text-truncate">{{ .String "name" }}</span>
+        <span class="shrink-0 {{ if eq (.String "status") "down" }}color-negative{{ end }}">{{ .String "status" }} · {{ printf "%.0f" (.Float "uptime") }} %</span>
+      </li>
+      {{ end }}{{ end }}
+    </ul>
+    {{ else }}
+    <p class="color-negative">Uptime Kuma is not answering: {{ .JSON.String "kuma.error" }}</p>
+    {{ end }}
+
+- type: custom-api
+  title: Events
+  cache: 1m
+  url: ${PULSE_SUMMARY_URL}
+  template: |
+    <ul class="list list-gap-8 size-h6">
+      {{ range $i, $e := .JSON.Array "events" }}{{ if lt $i 10 }}
+      <li class="flex gap-7">
+        <span class="shrink-0 {{ if eq ($e.String "level") "crit" }}color-negative{{ else if eq ($e.String "level") "ok" }}color-positive{{ else }}color-primary{{ end }}">●</span>
+        <span class="grow min-width-0">{{ $e.String "text" }}</span>
+        <span class="shrink-0 color-subdue" {{ parseTime "unix" (printf "%d" (toInt (div (toFloat ($e.Int "t")) 1000))) | toRelativeTime }}></span>
+      </li>
+      {{ end }}{{ end }}
+    </ul>
+    <p class="size-h6 color-subdue margin-top-10">Pulse {{ .JSON.String "pulse.version" }}{{ if not (.JSON.Bool "pulse.ok") }} · <span class="color-negative">not answering</span>{{ end }}</p>

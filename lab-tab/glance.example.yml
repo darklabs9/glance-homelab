@@ -1,0 +1,35 @@
+# glance.yml: the Lab page. Copy pulse-widgets.yml next to this file, and nas-tab/assets/nas.js + nas.css
+# into the assets folder. lab-state.py writes OUTPUT=<assets>/data/lab-state.json.
+server:
+  assets-path: /app/assets
+
+document:
+  head: |
+    <link rel="stylesheet" href="/assets/nas.css">
+    <script src="/assets/nas.js" defer></script>
+
+# Same palette as nas.css, so the Glance widgets and the lab app look like one page
+theme:
+  background-color: 210 20 6
+  primary-color: 174 59 56
+  positive-color: 174 59 56
+  negative-color: 0 100 71
+  contrast-multiplier: 1.1
+
+pages:
+  - name: Lab
+    slug: lab
+    width: wide
+    columns:
+      - size: full
+        widgets:
+          - type: html
+            hide-header: true
+            source: |
+              <div class="nas-app" data-nas-app data-src="/assets/data/lab-state.json" data-stale-after="300">
+                <input type="hidden" class="nas-keep">
+                <noscript>This page needs JavaScript.</noscript>
+              </div>
+      - size: small
+        widgets:
+          - $include: pulse-widgets.yml

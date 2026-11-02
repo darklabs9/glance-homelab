@@ -75,6 +75,12 @@ separate modules: take the one that solves your annoyance and ignore the rest.
   </tr>
 </table>
 
+### Fork addition: lab-tab
+
+[`lab-tab`](lab-tab) is the NAS page for a whole homelab (a Proxmox cluster with dozens of guests) instead of one
+Docker host: services from a catalogue, health probes, a Pulse summary, a NUT UPS and GitLab schedules, drawn by
+the same `nas.js`. Plus a side column of Glance widgets for nodes, storage, Uptime Kuma and events.
+
 ## Quick start
 
 Each module has its own README with requirements, install steps and a configuration table. The short version:

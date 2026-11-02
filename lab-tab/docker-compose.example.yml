@@ -1,0 +1,38 @@
+# Glance + the lab-state collector. They share one small tmpfs volume for the JSON, so nothing is written
+# to disk and neither container needs to be root. Layout next to this file:
+#   config/glance.yml, config/pulse-widgets.yml     (from glance.example.yml / pulse-widgets.yml)
+#   assets/nas.js, assets/nas.css, assets/data/     (from nas-tab/assets; data/ stays empty in git)
+#   collector/lab-state.py, catalogue.json, config.env
+services:
+  glance:
+    image: glanceapp/glance:v0.8.7
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    ports: ["8080:8080"]
+    environment:
+      PULSE_SUMMARY_URL: ${PULSE_SUMMARY_URL}
+    volumes:
+      - ./config:/app/config:ro
+      - ./assets:/app/assets:ro
+      - lab-data:/app/assets/data:ro
+
+  lab-state:
+    image: python:3.13-alpine
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    command: ["python3", "-u", "/opt/lab-tab/lab-state.py", "--config", "/opt/lab-tab/config.env", "--loop", "60"]
+    environment:
+      OUTPUT: /data/lab-state.json
+      CATALOGUE: /opt/lab-tab/catalogue.json
+    volumes:
+      - ./collector/lab-state.py:/opt/lab-tab/lab-state.py:ro
+      - ./catalogue.json:/opt/lab-tab/catalogue.json:ro
+      - ./config.env:/opt/lab-tab/config.env:ro
+      - lab-data:/data
+
+volumes:
+  lab-data:
+    driver: local
+    driver_opts: {type: tmpfs, device: tmpfs, o: "size=8m,uid=65534,gid=65534,mode=0755"}
